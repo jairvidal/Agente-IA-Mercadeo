@@ -1,0 +1,28 @@
+# Terraform state — never commit
+*.tfstate
+*.tfstate.*
+*.tfstate.backup
+
+# Terraform working directory
+.terraform/
+.terraform.lock.hcl.bak
+
+# Variable files with real values — only .example files are committed
+*.tfvars
+!*.tfvars.example
+
+# Crash logs
+crash.log
+crash.*.log
+
+# Override files (local experiments)
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+
+# direnv — local credential exports, never commit
+.envrc
+!.envrc.example
+
+# NOTE: .terraform.lock.hcl IS committed (provider version pinning)

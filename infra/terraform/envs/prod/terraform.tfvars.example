@@ -1,0 +1,15 @@
+# Copy to terraform.tfvars (DO NOT commit terraform.tfvars — real values stay local)
+# Apply prod ONLY after staging smoke tests pass (sprint-1-prd.md E-00.8)
+
+env         = "prod"
+aws_region  = "us-east-1"
+name_prefix = "sidoc-ai-marketing"
+
+# Set once SIDOC confirms subdomain delegation
+# domain_name = "ai.sidoc.com.co"
+
+# Email for CloudWatch alarm notifications
+# alert_email = "yonnathan.henao@morphux.co"
+
+# Langfuse: confirm SIDOC Habeas Data sign-off before setting prod value
+# langfuse_host = "https://cloud.langfuse.com"

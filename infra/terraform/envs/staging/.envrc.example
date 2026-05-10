@@ -1,0 +1,16 @@
+# direnv config for local Terraform usage.
+# Copy to `.envrc` (gitignored) and run `direnv allow` once.
+#
+# Why: the AWS Go SDK used by Terraform does not read non-standard credential
+# stores (e.g. the company login tool that writes to ~/.aws/login/). Exporting
+# short-lived session credentials as env vars works with any auth provider.
+#
+# Requirements:
+#   - direnv installed (`brew install direnv` + hook in your shell)
+#   - AWS CLI v2.10+ (for `aws configure export-credentials`)
+#   - Active AWS session before entering this directory
+
+eval "$(aws configure export-credentials --format env)"
+
+# Optional: pin region explicitly so Terraform never falls back to a stale default.
+export AWS_REGION=us-east-1

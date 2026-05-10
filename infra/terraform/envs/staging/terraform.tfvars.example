@@ -1,0 +1,15 @@
+# Copy to terraform.tfvars (DO NOT commit terraform.tfvars — real values stay local)
+# Fill in actual values before running terraform plan/apply
+
+env         = "staging"
+aws_region  = "us-east-1"
+name_prefix = "sidoc-ai-marketing"
+
+# Set once SIDOC confirms subdomain delegation
+# domain_name = "ai.sidoc.com.co"
+
+# Email for CloudWatch alarm notifications (E-00.6)
+# alert_email = "yonnathan.henao@morphux.co"
+
+# Langfuse host. Default is Cloud; override to self-hosted if SIDOC requires.
+# langfuse_host = "https://cloud.langfuse.com"
