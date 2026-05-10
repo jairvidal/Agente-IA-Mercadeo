@@ -1,0 +1,35 @@
+# OS noise
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editors / IDEs
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Logs
+*.log
+logs/
+
+# Bun / Node runtime
+node_modules/
+*.tsbuildinfo
+.turbo/
+
+# Build outputs
+dist/
+build/
+.cache/
+
+# Local env (per-app .gitignore is the source of truth for what specific apps need;
+# this catches stray .env at the repo root)
+.env
+.env.local
+.env.*.local
+
+# Direnv
+.envrc
+!.envrc.example

@@ -1,0 +1,12 @@
+node_modules
+dist
+.env
+.env.local
+*.log
+
+# TS build info
+*.tsbuildinfo
+.turbo
+
+# TanStack Router generated cache
+.tanstack/
