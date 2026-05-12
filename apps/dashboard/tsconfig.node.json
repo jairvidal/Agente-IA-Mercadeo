@@ -6,8 +6,8 @@
     "moduleResolution": "bundler",
     "skipLibCheck": true,
     "strict": true,
-    "noEmit": true,
     "composite": true,
+    "emitDeclarationOnly": true,
     "allowSyntheticDefaultImports": true,
     "types": ["node"]
   },
