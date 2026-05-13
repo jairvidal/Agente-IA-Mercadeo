@@ -8,6 +8,7 @@
     "strict": true,
     "composite": true,
     "emitDeclarationOnly": true,
+    "outDir": "./node_modules/.cache/tsconfig-node",
     "allowSyntheticDefaultImports": true,
     "types": ["node"]
   },
