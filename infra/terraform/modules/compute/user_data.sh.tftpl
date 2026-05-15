@@ -1,0 +1,87 @@
+#!/usr/bin/env bash
+set -euo pipefail
+exec > >(tee -a /var/log/user-data.log) 2>&1
+
+ENV="${env}"
+SECRET_ID="${secret_id}"
+AWS_REGION="${aws_region}"
+
+export DEBIAN_FRONTEND=noninteractive
+
+apt-get update -y
+apt-get upgrade -y
+apt-get install -y ca-certificates curl gnupg lsb-release unzip jq
+
+install -m 0755 -d /etc/apt/keyrings
+curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+chmod a+r /etc/apt/keyrings/docker.gpg
+
+cat <<'REPO' > /etc/apt/sources.list.d/docker.list
+deb [arch=arm64 signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu jammy stable
+REPO
+
+apt-get update -y
+apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+
+systemctl enable --now docker
+
+curl -fsSL "https://awscli.amazonaws.com/awscli-exe-linux-aarch64.zip" -o /tmp/awscliv2.zip
+unzip -q /tmp/awscliv2.zip -d /tmp
+/tmp/aws/install
+rm -rf /tmp/aws /tmp/awscliv2.zip
+
+install -d -m 0755 /opt/sidoc-ai
+install -d -m 0700 /run/sidoc-ai
+
+cat <<BOOTSTRAP > /opt/sidoc-ai/bootstrap.sh
+#!/usr/bin/env bash
+set -euo pipefail
+
+ENV_DIR="/run/sidoc-ai"
+ENV_FILE="\$ENV_DIR/.env"
+
+install -d -m 0700 "\$ENV_DIR"
+
+aws secretsmanager get-secret-value \\
+  --region "$AWS_REGION" \\
+  --secret-id "$SECRET_ID" \\
+  --query SecretString \\
+  --output text \\
+  | jq -r 'to_entries | .[] | "\(.key)=\(.value)"' > "\$ENV_FILE"
+
+chmod 0600 "\$ENV_FILE"
+
+if [ -f /opt/sidoc-ai/docker-compose.yml ]; then
+  /usr/bin/docker compose \\
+    -f /opt/sidoc-ai/docker-compose.yml \\
+    --env-file "\$ENV_FILE" \\
+    up -d --remove-orphans
+else
+  echo "[bootstrap] docker-compose.yml not present yet (deploy pending). Service stays ready."
+fi
+BOOTSTRAP
+
+chmod 0755 /opt/sidoc-ai/bootstrap.sh
+
+cat <<'UNIT' > /etc/systemd/system/sidoc-ai-bootstrap.service
+[Unit]
+Description=SIDOC AI runtime bootstrap (read Secrets Manager and start containers)
+After=network-online.target docker.service
+Wants=network-online.target
+Requires=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/opt/sidoc-ai/bootstrap.sh
+RemainAfterExit=yes
+Restart=on-failure
+RestartSec=15s
+
+[Install]
+WantedBy=multi-user.target
+UNIT
+
+systemctl daemon-reload
+systemctl enable --now sidoc-ai-bootstrap.service || true
+
+echo "[user-data] bootstrap complete for env=$ENV"
