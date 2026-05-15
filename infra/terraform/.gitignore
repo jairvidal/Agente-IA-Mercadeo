@@ -7,6 +7,10 @@
 .terraform/
 .terraform.lock.hcl.bak
 
+# Plan output files — temporary, may contain sensitive values
+*.tfplan
+*.tfplan.json
+
 # Variable files with real values — only .example files are committed
 *.tfvars
 !*.tfvars.example

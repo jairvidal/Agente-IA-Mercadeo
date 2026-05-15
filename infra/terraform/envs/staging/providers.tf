@@ -6,7 +6,7 @@ provider "aws" {
       Project     = "sidoc-ai-marketing"
       Environment = var.env
       ManagedBy   = "Terraform"
-      Owner       = "Morphux"
+      Owner       = "Sidoc"
       CostCenter  = "OS-51468"
     }
   }
