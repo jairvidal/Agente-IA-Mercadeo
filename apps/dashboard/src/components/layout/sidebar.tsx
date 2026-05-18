@@ -42,23 +42,20 @@ export function Sidebar({
       )}
     >
       <div className="flex h-14 shrink-0 items-center justify-center">
-        <Link to="/dashboard" onClick={onNavigate}>
+        <Link to="/dashboard" onClick={onNavigate} aria-label="Sidoc — ir al dashboard">
           {isCollapsed ? (
-            <div className="h-9 w-9 rounded-lg flex items-center justify-center bg-primary">
-              <span className="text-xs font-bold text-white leading-none">S</span>
-            </div>
+            <img
+              src="/favicon.png"
+              alt=""
+              aria-hidden="true"
+              className="h-9 w-9 object-contain"
+            />
           ) : (
-            <div className="flex items-center gap-2.5 px-2">
-              <div className="h-8 w-8 rounded-lg flex items-center justify-center bg-primary shrink-0">
-                <span className="text-[11px] font-bold text-white leading-none">S</span>
-              </div>
-              <div className="flex flex-col">
-                <span className="text-sm font-bold text-foreground leading-none">SIDOC</span>
-                <span className="text-[10px] text-muted-foreground leading-tight mt-0.5">
-                  Panel de gestión
-                </span>
-              </div>
-            </div>
+            <img
+              src="/sidoc-logo.png"
+              alt="Sidoc"
+              className="h-10 w-auto object-contain px-2"
+            />
           )}
         </Link>
       </div>

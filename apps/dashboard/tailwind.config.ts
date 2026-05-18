@@ -7,7 +7,7 @@ const config: Config = {
   theme: {
     extend: {
       fontFamily: {
-        sans: ["Inter", ...fontFamily.sans],
+        sans: ["Manrope", "Tahoma", "Calibri", ...fontFamily.sans],
       },
       colors: {
         border: "hsl(var(--border))",
@@ -15,6 +15,17 @@ const config: Config = {
         ring: "hsl(var(--ring))",
         background: "hsl(var(--background))",
         foreground: "hsl(var(--foreground))",
+        brand: {
+          red: "hsl(var(--brand-red))",
+          "red-2": "hsl(var(--brand-red-2))",
+          "red-3": "hsl(var(--brand-red-3))",
+          orange: "hsl(var(--brand-orange))",
+          "orange-2": "hsl(var(--brand-orange-2))",
+          yellow: "hsl(var(--brand-yellow))",
+          "yellow-2": "hsl(var(--brand-yellow-2))",
+          gray: "hsl(var(--brand-gray))",
+          "gray-2": "hsl(var(--brand-gray-2))",
+        },
         primary: {
           DEFAULT: "hsl(var(--primary))",
           foreground: "hsl(var(--primary-foreground))",
