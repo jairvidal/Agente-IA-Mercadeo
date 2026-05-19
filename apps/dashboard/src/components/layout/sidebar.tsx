@@ -45,16 +45,16 @@ export function Sidebar({
         <Link to="/dashboard" onClick={onNavigate} aria-label="Sidoc — ir al dashboard">
           {isCollapsed ? (
             <img
-              src="/favicon.png"
+              src="/favicon.svg"
               alt=""
               aria-hidden="true"
-              className="h-9 w-9 object-contain"
+              className="h-9 w-9"
             />
           ) : (
             <img
-              src="/sidoc-logo.png"
+              src="/sidoc-logo.svg"
               alt="Sidoc"
-              className="h-10 w-auto object-contain px-2"
+              className="h-10 w-auto px-2"
             />
           )}
         </Link>
