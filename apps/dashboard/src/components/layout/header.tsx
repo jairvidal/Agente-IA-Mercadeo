@@ -3,7 +3,7 @@ import { LogOut } from "lucide-react";
 import { useNavigate } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
 
-import { useSession } from "@/hooks/use-session";
+import { useSession } from "@/features/auth";
 import { apiClient, ApiError } from "@/lib/api";
 
 import { ThemeToggle } from "./theme-toggle";
