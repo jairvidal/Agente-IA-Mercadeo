@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 220 64" role="img" aria-label="Sidoc">
+  <text
+    x="50%"
+    y="50%"
+    dominant-baseline="central"
+    text-anchor="middle"
+    font-family="Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif"
+    font-weight="800"
+    font-size="44"
+    letter-spacing="2"
+    fill="hsl(349, 80%, 48%)"
+  >SIDOC</text>
+</svg>
