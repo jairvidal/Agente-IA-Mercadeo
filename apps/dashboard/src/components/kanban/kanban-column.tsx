@@ -8,9 +8,10 @@ interface KanbanColumnProps {
   label: string;
   items: KanbanItem[];
   color: string;
+  onItemClick?: (id: string) => void;
 }
 
-export function KanbanColumn({ id, label, items, color }: KanbanColumnProps) {
+export function KanbanColumn({ id, label, items, color, onItemClick }: KanbanColumnProps) {
   return (
     <div className="flex flex-col w-64 shrink-0">
       <div className="flex items-center gap-2 mb-3 px-1">
@@ -38,6 +39,7 @@ export function KanbanColumn({ id, label, items, color }: KanbanColumnProps) {
                 name={item.name}
                 company={item.company}
                 source={item.source}
+                onClick={onItemClick ? () => onItemClick(item.id) : undefined}
               />
             ))}
             {provided.placeholder}

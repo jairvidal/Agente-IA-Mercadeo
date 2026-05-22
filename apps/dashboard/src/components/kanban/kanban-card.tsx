@@ -9,6 +9,7 @@ interface KanbanCardProps {
   name: string;
   company?: string | null;
   source?: string | null;
+  onClick?: () => void;
 }
 
 const sourceVariant: Record<string, BadgeVariants["variant"]> = {
@@ -18,7 +19,7 @@ const sourceVariant: Record<string, BadgeVariants["variant"]> = {
   "Cold Call": "warning",
 };
 
-export function KanbanCard({ id, index, name, company, source }: KanbanCardProps) {
+export function KanbanCard({ id, index, name, company, source, onClick }: KanbanCardProps) {
   return (
     <Draggable draggableId={id} index={index}>
       {(provided, snapshot) => (
@@ -26,9 +27,10 @@ export function KanbanCard({ id, index, name, company, source }: KanbanCardProps
           ref={provided.innerRef}
           {...provided.draggableProps}
           {...provided.dragHandleProps}
+          onClick={onClick}
           className={`bg-white rounded-lg border border-gray-200 p-3 shadow-sm select-none transition-shadow ${
             snapshot.isDragging ? "shadow-lg ring-2 ring-primary/20" : ""
-          }`}
+          } ${onClick ? "cursor-pointer hover:border-primary/40 hover:shadow-md" : ""}`}
         >
           <p className="text-sm font-medium text-gray-900 truncate">{name}</p>
           {company && (

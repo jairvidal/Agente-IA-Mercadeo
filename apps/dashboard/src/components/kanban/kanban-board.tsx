@@ -21,9 +21,10 @@ interface KanbanBoardProps {
   columns: KanbanColumnDef[];
   items: KanbanItem[];
   onStatusChange: (itemId: string, newStatus: string) => Promise<void>;
+  onItemClick?: (itemId: string) => void;
 }
 
-export function KanbanBoard({ columns, items, onStatusChange }: KanbanBoardProps) {
+export function KanbanBoard({ columns, items, onStatusChange, onItemClick }: KanbanBoardProps) {
   const [localItems, setLocalItems] = useState<KanbanItem[]>(items);
 
   useEffect(() => {
@@ -59,6 +60,7 @@ export function KanbanBoard({ columns, items, onStatusChange }: KanbanBoardProps
             label={col.label}
             color={col.color}
             items={localItems.filter((i) => i.status === col.id)}
+            onItemClick={onItemClick}
           />
         ))}
       </div>
