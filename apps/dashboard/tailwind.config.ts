@@ -7,7 +7,7 @@ const config: Config = {
   theme: {
     extend: {
       fontFamily: {
-        sans: ["Inter", ...fontFamily.sans],
+        sans: ["Tahoma", "Calibri", ...fontFamily.sans],
       },
       colors: {
         border: "hsl(var(--border))",
@@ -15,6 +15,14 @@ const config: Config = {
         ring: "hsl(var(--ring))",
         background: "hsl(var(--background))",
         foreground: "hsl(var(--foreground))",
+        // Sidoc primary palette only (manual p.10). Secondary tones are
+        // approval-gated (manual p.11); access them via hsl(var(--brand-…))
+        // when a "special application" justifies it.
+        brand: {
+          red: "hsl(var(--brand-red))",
+          orange: "hsl(var(--brand-orange))",
+          gray: "hsl(var(--brand-gray))",
+        },
         primary: {
           DEFAULT: "hsl(var(--primary))",
           foreground: "hsl(var(--primary-foreground))",
