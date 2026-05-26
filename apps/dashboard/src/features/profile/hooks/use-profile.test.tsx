@@ -12,8 +12,9 @@ vi.mock("../api/profile-api", () => ({
 }));
 
 import { useProfile, useUpdateProfile } from "./use-profile";
+import type { Profile } from "../schemas/profile-schema";
 
-const validProfile = {
+const validProfile: Profile = {
   id: "dev",
   email: "dev@sidoc.co",
   name: "Dev User",
@@ -62,11 +63,57 @@ describe("useUpdateProfile", () => {
     updateProfileMock.mockReset();
   });
 
-  it("writes the server response to the profile cache on success", async () => {
+  it("writes the optimistic value to the cache before the mutation resolves", async () => {
     const client = makeClient();
     client.setQueryData(["profile"], validProfile);
-    const updated = { ...validProfile, name: "Updated" };
-    updateProfileMock.mockResolvedValueOnce(updated);
+
+    let resolveUpdate: (value: Profile) => void = () => {};
+    updateProfileMock.mockImplementationOnce(
+      () => new Promise<Profile>((resolve) => { resolveUpdate = resolve; }),
+    );
+
+    const { result } = renderHook(() => useUpdateProfile(), { wrapper: wrap(client) });
+
+    act(() => {
+      result.current.mutate({ name: "Optimistic" });
+    });
+
+    await waitFor(() => {
+      expect(client.getQueryData<Profile>(["profile"])).toEqual({
+        ...validProfile,
+        name: "Optimistic",
+      });
+    });
+    expect(updateProfileMock).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      resolveUpdate({ ...validProfile, name: "Optimistic" });
+    });
+  });
+
+  it("rolls back to the previous cache value when the mutation fails", async () => {
+    const client = makeClient();
+    client.setQueryData(["profile"], validProfile);
+    updateProfileMock.mockRejectedValueOnce(new Error("network down"));
+
+    const { result } = renderHook(() => useUpdateProfile(), { wrapper: wrap(client) });
+
+    await act(async () => {
+      try {
+        await result.current.mutateAsync({ name: "WillFail" });
+      } catch {
+        // expected
+      }
+    });
+
+    expect(client.getQueryData<Profile>(["profile"])).toEqual(validProfile);
+  });
+
+  it("cancels in-flight profile queries before applying the optimistic update", async () => {
+    const client = makeClient();
+    client.setQueryData(["profile"], validProfile);
+    const cancelSpy = vi.spyOn(client, "cancelQueries");
+    updateProfileMock.mockResolvedValueOnce({ ...validProfile, name: "Updated" });
 
     const { result } = renderHook(() => useUpdateProfile(), { wrapper: wrap(client) });
 
@@ -74,6 +121,31 @@ describe("useUpdateProfile", () => {
       await result.current.mutateAsync({ name: "Updated" });
     });
 
-    expect(client.getQueryData(["profile"])).toEqual(updated);
+    expect(cancelSpy).toHaveBeenCalledWith({ queryKey: ["profile"] });
+  });
+
+  it("reconciles cache with server value after successful mutation via invalidateQueries", async () => {
+    const client = makeClient();
+    const serverValue: Profile = { ...validProfile, name: "Server Truth" };
+    fetchProfileMock
+      .mockResolvedValueOnce(validProfile)
+      .mockResolvedValueOnce(serverValue);
+    updateProfileMock.mockResolvedValueOnce({ ...validProfile, name: "Optimistic" });
+
+    const { result } = renderHook(
+      () => ({ profile: useProfile(), mutation: useUpdateProfile() }),
+      { wrapper: wrap(client) },
+    );
+
+    await waitFor(() => expect(result.current.profile.isSuccess).toBe(true));
+
+    await act(async () => {
+      await result.current.mutation.mutateAsync({ name: "Optimistic" });
+    });
+
+    await waitFor(() => {
+      expect(result.current.profile.data).toEqual(serverValue);
+    });
+    expect(fetchProfileMock).toHaveBeenCalledTimes(2);
   });
 });
