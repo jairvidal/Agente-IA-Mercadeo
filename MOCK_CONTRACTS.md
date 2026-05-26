@@ -79,6 +79,7 @@ interface ProfileResponse {
 
 #### Notas y asunciones
 
+- **Trazabilidad del shape:** el shape base de `Profile` ({ id, email, name, createdAt }) ya existía como `interface Profile` inline en `apps/dashboard/src/routes/_dashboard.profile.tsx` en staging antes de esta HU. Lo que esta HU asume/formaliza: validación `.email()` para el campo email, ISO 8601 datetime para createdAt, nullabilidad explícita de `name`, y límite de longitud 1-80 caracteres para `name` (solo aplica a PATCH).
 - Mientras HU-FE-002 (login real) esté pausada, el frontend usa `STUB_SESSION` definido en `apps/dashboard/src/features/auth/api/auth-api.ts`. Por coherencia visual, el `mockProfileState` inicial en `profile-api.ts` deriva del mismo stub (`id: "dev"`, `email: "dev@sidoc.co"`, `name: "Dev User"`). Cuando HU-FE-002 se reactive, validar que el `id` del perfil retornado por el backend coincida con el `id` del usuario autenticado.
 - Asumimos que `name` es `nullable` para permitir cuentas recién creadas sin nombre. Confirmar con Yonathan si efectivamente puede llegar `null` en producción o si el backend siempre asigna un valor por defecto.
 
@@ -120,6 +121,8 @@ interface ProfileResponse {
 - **500**: TBD — confirmar formato de error de servidor con Yonathan
 
 #### Notas y asunciones
+
+- **Trazabilidad del shape:** el shape base de `Profile` ({ id, email, name, createdAt }) ya existía como `interface Profile` inline en `apps/dashboard/src/routes/_dashboard.profile.tsx` en staging antes de esta HU. Lo que esta HU asume/formaliza: validación `.email()` para el campo email, ISO 8601 datetime para createdAt, nullabilidad explícita de `name`, y límite de longitud 1-80 caracteres para `name` (solo aplica a PATCH).
 
 Preguntas concretas para Yonathan:
 

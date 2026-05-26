@@ -53,7 +53,7 @@ export function ProfileForm({ profile }: ProfileFormProps) {
         <div className="space-y-1.5">
           <label className="text-sm font-medium text-foreground">Miembro desde</label>
           <p className="text-sm text-muted-foreground">
-            {new Date(profile.createdAt).toLocaleDateString()}
+            {new Date(profile.createdAt).toLocaleDateString("es-CO")}
           </p>
         </div>
         <Button type="submit" disabled={updateMutation.isPending}>

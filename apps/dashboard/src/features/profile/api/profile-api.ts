@@ -6,6 +6,12 @@ const MOCK_DELAY_MS = 400;
 
 // Mock derived from STUB_SESSION (features/auth/api/auth-api.ts) so the profile
 // stays visually coherent with the session while HU-FE-002 is paused.
+// Module-level mock state.
+// Persists across navigations within the same session, but resets on:
+//   - Full page reload (F5)
+//   - Vite HMR reload of this file
+//   - Test isolation (each test file gets a fresh module instance)
+// This is intentional for a simple mock. Replace with real backend when wired.
 let mockProfileState: Profile = {
   id: "dev",
   email: "dev@sidoc.co",
