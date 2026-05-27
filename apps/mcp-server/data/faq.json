@@ -1,0 +1,118 @@
+{
+  "empresa": {
+    "nombre": "Siderúrgica Del Occidente S.A.S. (Sidoc)",
+    "sector": "Siderurgia y materiales para construcción",
+    "descripcion": "Empresa colombiana con más de 38 años de experiencia, dedicada a la fabricación y comercialización de acero, así como a la distribución de materiales complementarios para la construcción, ferretería y remodelación.",
+    "sitio_web": "https://sidocsa.com"
+  },
+  "tiendas": [
+    {
+      "ciudad": "Yumbo (Sede Principal)",
+      "nombre": "Sidoc Acopi",
+      "direccion": "Cra. 37 # 12A - 63 Acopi, Yumbo, Valle del Cauca",
+      "horario": "Lunes a Viernes 8:00 AM - 12:30 PM y 1:30 PM - 5:00 PM, Sábados 8:00 AM - 12:00 PM",
+      "telefono": "+57 (602) 664-4717"
+    },
+    {
+      "ciudad": "Cali",
+      "nombre": "Sidoc Santa Elena",
+      "direccion": "Calle 23 # 35 – 08 B/Santa Elena",
+      "horario": "Lunes a Viernes 8:00 AM - 12:30 PM y 1:30 PM - 5:00 PM, Sábados 8:00 AM - 12:00 PM",
+      "telefono": "315 490 0356"
+    },
+    {
+      "ciudad": "Cali",
+      "nombre": "Sidoc Mojica",
+      "direccion": "Calle 83 # 28 D2 – 70 B/Mojica",
+      "horario": "Lunes a Viernes 8:00 AM - 12:30 PM y 1:30 PM - 5:00 PM, Sábados 8:00 AM - 12:00 PM",
+      "telefono": "315 584 7099"
+    },
+    {
+      "ciudad": "Cali",
+      "nombre": "Sidoc Alfonso López",
+      "direccion": "Carrera 8 # 76 – 03 B/Alfonso López",
+      "horario": "Lunes a Viernes 8:00 AM - 12:30 PM y 1:30 PM - 5:00 PM, Sábados 8:00 AM - 12:00 PM",
+      "telefono": "317 648 0270"
+    },
+    {
+      "ciudad": "Jamundí",
+      "nombre": "Sidoc Jamundí",
+      "direccion": "Carrera 4 # 7A – 29 B/Las Acacias",
+      "horario": "Lunes a Viernes 8:00 AM - 12:30 PM y 1:30 PM - 5:00 PM, Sábados 8:00 AM - 12:00 PM",
+      "telefono": "317 331 6905"
+    },
+    {
+      "ciudad": "Pereira",
+      "nombre": "Sidoc Pereira",
+      "direccion": "Carrera 2N # 10 - 113 Bodega 11 (Av. La Romelia El Pollo) Dosquebradas",
+      "horario": "Lunes a Viernes 8:00 AM - 12:30 PM y 1:30 PM - 5:00 PM, Sábados 8:00 AM - 12:00 PM",
+      "telefono": "318 750 1184"
+    },
+    {
+      "ciudad": "Popayán",
+      "nombre": "Sidoc Popayán",
+      "direccion": "Carrera 50 # 5 – 39 B/Chune",
+      "horario": "Lunes a Viernes 8:00 AM - 12:30 PM y 1:30 PM - 5:00 PM, Sábados 8:00 AM - 12:00 PM",
+      "telefono": "317 432 3245"
+    },
+    {
+      "ciudad": "Buenaventura",
+      "nombre": "Sidoc Buenaventura",
+      "direccion": "Avenida Simón Bolívar – Calle 1 # 71A – 35 B/Alfonso López",
+      "horario": "Lunes a Viernes 7:30 AM - 12:30 PM y 2:00 PM - 5:00 PM, Sábados 8:00 AM - 12:00 PM",
+      "telefono": "318 319 1246"
+    },
+    {
+      "ciudad": "Pasto",
+      "nombre": "Sidoc Pasto",
+      "direccion": "Carrera 6 # 9 – 101 Km 4 salida al sur",
+      "horario": "Lunes a Viernes 7:30 AM - 12:30 PM y 2:00 PM - 5:00 PM, Sábados 8:00 AM - 12:00 PM",
+      "telefono": "316 027 5428"
+    }
+  ],
+  "servicios": [
+    {
+      "nombre": "Portafolio Siderúrgico",
+      "descripcion": "Venta de barras corrugadas, chipas, grafil, mallas electrosoldadas, ángulos y platinas."
+    },
+    {
+      "nombre": "Construcción Liviana y Acabados",
+      "descripcion": "Venta de sistemas drywall, superboard, pinturas, estucos, cemento y tejas (metálicas, fibrocemento, PVC)."
+    },
+    {
+      "nombre": "Acero Figurado",
+      "descripcion": "Servicio de corte y doblado de acero según despiece estructural para obras."
+    },
+    {
+      "nombre": "Canales de Atención Digital",
+      "descripcion": "Pagos en línea (PSE), consulta de certificados de retención y portal de proveedores."
+    }
+  ],
+  "preguntas_frecuentes": [
+    {
+      "pregunta": "¿Qué horario de atención manejan?",
+      "respuesta": "En Cali, Jamundí, Pereira y Popayán: L-V 8:00am-12:30pm y 1:30pm-5:00pm. En Buenaventura y Pasto inician a las 7:30am. Todos los sábados de 8:00am a 12:00pm.",
+      "categoria": "horarios"
+    },
+    {
+      "pregunta": "¿Cómo me comunico con un asesor?",
+      "respuesta": "Puede escribir al WhatsApp de su tienda más cercana. Por ejemplo, para Cali Santa Elena al 318 225 6271 o al correo santaelena@sidocsa.com.",
+      "categoria": "contacto"
+    },
+    {
+      "pregunta": "¿Venden materiales de construcción aparte de acero?",
+      "respuesta": "Sí, nuestro catálogo incluye cemento, estucos, pinturas, tejas, sistemas de construcción liviana (drywall) y tubería estructural.",
+      "categoria": "productos"
+    },
+    {
+      "pregunta": "¿Dónde están ubicados en el Eje Cafetero?",
+      "respuesta": "Estamos en Dosquebradas (Pereira), en la Carrera 2N # 10-113 Bodega 11, sobre la Avenida La Romelia El Pollo.",
+      "categoria": "ubicacion"
+    },
+    {
+      "pregunta": "¿Tienen servicio de pago en línea?",
+      "respuesta": "Sí, contamos con botón de pagos PSE disponible en nuestra página web para facilitar sus transacciones.",
+      "categoria": "pagos"
+    }
+  ]
+}

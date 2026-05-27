@@ -1,0 +1,31 @@
+# MCP Server (Bun + @modelcontextprotocol/sdk)
+# The workspace root .gitignore covers most of this; rules here are explicit
+# so the mcp-server remains self-contained if it ever stands alone.
+
+# Dependencies
+node_modules/
+
+# Build / TS incremental
+dist/
+*.tsbuildinfo
+
+# Env files (never commit) — keep .env.example versioned
+.env
+.env.*
+!.env.example
+
+# Logs
+*.log
+logs/
+
+# Test coverage
+coverage/
+.nyc_output/
+
+# OS / editor cruft
+.DS_Store
+.vscode/
+.idea/
+
+# Bun compiled binaries (NOT bun.lock — that gets committed)
+*.bun
