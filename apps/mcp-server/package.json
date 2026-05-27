@@ -1,0 +1,22 @@
+{
+  "name": "mcp-server",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "bun --env-file=.env --watch src/index.ts",
+    "start": "bun --env-file=.env src/index.ts",
+    "test": "bun test",
+    "type-check": "tsc --noEmit",
+    "clean": "rm -rf dist",
+    "inspector": "bunx @modelcontextprotocol/inspector --port 4000"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.11.0",
+    "zod": "^3.24.2"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "typescript": "^6.0.3"
+  }
+}
