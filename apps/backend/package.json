@@ -7,10 +7,15 @@
 		"format": "bunx --bun @biomejs/biome format --write"
 	},
 	"dependencies": {
+		"@ai-sdk/anthropic": "^3.0.80",
+		"@ai-sdk/google": "^3.0.80",
+		"@ai-sdk/openai": "^3.0.66",
 		"@elysiajs/cors": "^1.4.2",
 		"@modelcontextprotocol/sdk": "^1.29.0",
+		"ai": "^6.0.191",
 		"elysia": "latest",
-		"ioredis": "^5.10.1"
+		"ioredis": "^5.10.1",
+		"zod": "^4.4.3"
 	},
 	"devDependencies": {
 		"@biomejs/biome": "2.4.15",

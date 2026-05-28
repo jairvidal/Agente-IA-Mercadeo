@@ -36,3 +36,51 @@ export class MessageChannelError extends Error {
 		if (cause !== undefined) this.cause = cause;
 	}
 }
+
+export class LlmProviderUnavailableError extends Error {
+	constructor(operation: string, cause?: unknown) {
+		super(`LLM provider unavailable: ${operation}`);
+		this.name = "LlmProviderUnavailableError";
+		if (cause !== undefined) this.cause = cause;
+	}
+}
+
+export class LlmTimeoutError extends Error {
+	constructor(
+		public readonly timeoutMs: number,
+		cause?: unknown,
+	) {
+		super(`LLM call exceeded ${timeoutMs}ms`);
+		this.name = "LlmTimeoutError";
+		if (cause !== undefined) this.cause = cause;
+	}
+}
+
+export class LlmRateLimitError extends Error {
+	constructor(
+		public readonly retryAfterMs?: number,
+		cause?: unknown,
+	) {
+		super(
+			retryAfterMs !== undefined
+				? `LLM rate limited (retry after ${retryAfterMs}ms)`
+				: "LLM rate limited",
+		);
+		this.name = "LlmRateLimitError";
+		if (cause !== undefined) this.cause = cause;
+	}
+}
+
+export class LlmInvalidResponseError extends Error {
+	constructor(reason: string, cause?: unknown) {
+		super(`LLM returned invalid response: ${reason}`);
+		this.name = "LlmInvalidResponseError";
+		if (cause !== undefined) this.cause = cause;
+	}
+}
+
+export type LlmError =
+	| LlmProviderUnavailableError
+	| LlmTimeoutError
+	| LlmRateLimitError
+	| LlmInvalidResponseError;
