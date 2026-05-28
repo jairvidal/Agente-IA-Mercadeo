@@ -1,7 +1,7 @@
 export interface OutgoingReply {
-  sessionId: string;
-  text: string;
-  metadata: {
-    chatId: number;
-  };
+	sessionId: string;
+	text: string;
+	metadata: {
+		chatId: number;
+	};
 }
