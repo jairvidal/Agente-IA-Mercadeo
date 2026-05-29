@@ -46,7 +46,13 @@ export interface VercelGenerateTextParams {
 	provider: LlmProviderType;
 	model: string;
 	apiKey: string;
-	messages: Array<{ role: "system" | "user" | "assistant"; content: string }>;
+	/**
+	 * Optional system prompt extracted from `role: "system"` messages by the
+	 * adapter before forwarding. Passed as the SDK's top-level `system` option
+	 * to avoid the `allowSystemInMessages` security warning in ai@6.
+	 */
+	system?: string;
+	messages: Array<{ role: "user" | "assistant"; content: string }>;
 	tools?: Array<{
 		name: string;
 		description: string;
@@ -60,7 +66,9 @@ export interface VercelGenerateObjectParams {
 	provider: LlmProviderType;
 	model: string;
 	apiKey: string;
-	messages: Array<{ role: "system" | "user" | "assistant"; content: string }>;
+	/** See {@link VercelGenerateTextParams.system}. */
+	system?: string;
+	messages: Array<{ role: "user" | "assistant"; content: string }>;
 	schema: unknown;
 	temperature: number;
 	abortSignal: AbortSignal;

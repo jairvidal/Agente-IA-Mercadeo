@@ -5,8 +5,14 @@ env         = "staging"
 aws_region  = "us-east-1"
 name_prefix = "sidoc-ai-marketing"
 
-# Set once SIDOC confirms subdomain delegation
-# domain_name = "ai.sidoc.com.co"
+# Confirmed subdomains (SIDOC, 2026-05-28)
+dashboard_fqdn = "marketing.stg.sidocsa.com"
+api_fqdn       = "api.marketing.stg.sidocsa.com"
+
+# Phase flag — keep false on first apply (cert created in PENDING, validation
+# records emitted as output → send to SIDOC). Flip true after SIDOC adds the
+# CNAME and the cert reaches ISSUED, then apply again to attach the CloudFront alias.
+dashboard_dns_enabled = false
 
 # Email for CloudWatch alarm notifications (E-00.6)
 # alert_email = "yonnathan.henao@morphux.co"

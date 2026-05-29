@@ -10,6 +10,7 @@
 # Plan output files — temporary, may contain sensitive values
 *.tfplan
 *.tfplan.json
+tfplan*
 
 # Variable files with real values — only .example files are committed
 *.tfvars

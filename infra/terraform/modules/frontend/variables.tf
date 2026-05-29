@@ -18,14 +18,14 @@ variable "dashboard_bucket_regional_domain" {
   type        = string
 }
 
-variable "domain_name" {
-  description = "Root domain for TLS (e.g. ai.sidoc.com.co). Null until SIDOC confirms delegation."
+variable "dashboard_fqdn" {
+  description = "FQDN of the dashboard SPA (e.g. marketing.stg.sidocsa.com). Required to create ACM cert; aliases attached only when dashboard_dns_enabled = true."
   type        = string
   default     = null
 }
 
-variable "acm_cert_arn" {
-  description = "ACM certificate ARN in us-east-1 (REQUIRED for CloudFront). Null during initial deploy."
-  type        = string
-  default     = null
+variable "dashboard_dns_enabled" {
+  description = "When true, waits for ACM cert validation and attaches the FQDN as a CloudFront alias. Set true only after SIDOC adds the validation CNAME."
+  type        = bool
+  default     = false
 }

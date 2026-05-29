@@ -16,10 +16,22 @@ variable "name_prefix" {
   default     = "sidoc-ai-marketing"
 }
 
-variable "domain_name" {
-  description = "Root domain for TLS and DNS (e.g. ai.sidoc.com.co). Null until SIDOC confirms subdomain delegation."
+variable "dashboard_fqdn" {
+  description = "FQDN of the dashboard SPA (e.g. marketing.stg.sidocsa.com). Used for ACM cert + CloudFront alias."
   type        = string
   default     = null
+}
+
+variable "api_fqdn" {
+  description = "FQDN of the backend API (e.g. api.marketing.stg.sidocsa.com). Used for Caddy auto-TLS + CORS whitelist."
+  type        = string
+  default     = null
+}
+
+variable "dashboard_dns_enabled" {
+  description = "Set true once SIDOC adds the ACM validation CNAME. Triggers cert validation wait + CloudFront alias attach."
+  type        = bool
+  default     = false
 }
 
 variable "alert_email" {

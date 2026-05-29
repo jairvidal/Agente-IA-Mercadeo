@@ -1,6 +1,33 @@
 locals {
-  name                = "${var.name_prefix}-${var.env}"
-  dashboard_subdomain = "dashboard.${var.env}"
+  name = "${var.name_prefix}-${var.env}"
+
+  # CloudFront aliases + ACM attachment only kick in once the cert is validated.
+  attach_custom_domain = var.dashboard_dns_enabled && var.dashboard_fqdn != null
+}
+
+# ACM certificate for the dashboard FQDN. CloudFront requires the cert in us-east-1.
+# Created in PENDING_VALIDATION state on first apply — SIDOC adds the validation
+# CNAME (see output `acm_validation_record`), then dashboard_dns_enabled flips true.
+resource "aws_acm_certificate" "dashboard" {
+  count = var.dashboard_fqdn != null ? 1 : 0
+
+  domain_name       = var.dashboard_fqdn
+  validation_method = "DNS"
+
+  tags = {
+    Name = "${local.name}-acm-dashboard"
+  }
+
+  lifecycle {
+    create_before_destroy = true
+  }
+}
+
+resource "aws_acm_certificate_validation" "dashboard" {
+  count = local.attach_custom_domain ? 1 : 0
+
+  certificate_arn         = aws_acm_certificate.dashboard[0].arn
+  validation_record_fqdns = [for r in aws_acm_certificate.dashboard[0].domain_validation_options : r.resource_record_name]
 }
 
 resource "aws_cloudfront_origin_access_control" "dashboard" {
@@ -62,14 +89,13 @@ resource "aws_cloudfront_distribution" "dashboard" {
   }
 
   viewer_certificate {
-    cloudfront_default_certificate = var.acm_cert_arn == null
-    acm_certificate_arn            = var.acm_cert_arn
-    ssl_support_method             = var.acm_cert_arn != null ? "sni-only" : null
-    minimum_protocol_version       = var.acm_cert_arn != null ? "TLSv1.2_2021" : null
+    cloudfront_default_certificate = !local.attach_custom_domain
+    acm_certificate_arn            = local.attach_custom_domain ? aws_acm_certificate_validation.dashboard[0].certificate_arn : null
+    ssl_support_method             = local.attach_custom_domain ? "sni-only" : null
+    minimum_protocol_version       = local.attach_custom_domain ? "TLSv1.2_2021" : null
   }
 
-  # aliases populated only after domain + ACM cert are confirmed
-  aliases = var.domain_name != null && var.acm_cert_arn != null ? ["${local.dashboard_subdomain}.${var.domain_name}"] : []
+  aliases = local.attach_custom_domain ? [var.dashboard_fqdn] : []
 
   tags = {
     Name = "${local.name}-cloudfront-dashboard"
@@ -80,8 +106,6 @@ resource "aws_cloudfront_distribution" "dashboard" {
 resource "aws_s3_bucket_policy" "dashboard" {
   bucket = var.dashboard_bucket_id
 
-  # depends on public access block in storage module being applied first;
-  # Terraform resolves this via module dependency ordering
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = [{
@@ -98,20 +122,3 @@ resource "aws_s3_bucket_policy" "dashboard" {
     }]
   })
 }
-
-# Route53 record — uncomment when SIDOC confirms domain and zone is in Route53
-# resource "aws_route53_record" "dashboard" {
-#   count   = var.domain_name != null ? 1 : 0
-#   zone_id = data.aws_route53_zone.main[0].zone_id
-#   name    = "${local.dashboard_subdomain}.${var.domain_name}"
-#   type    = "A"
-#   alias {
-#     name                   = aws_cloudfront_distribution.dashboard.domain_name
-#     zone_id                = aws_cloudfront_distribution.dashboard.hosted_zone_id
-#     evaluate_target_health = false
-#   }
-# }
-# data "aws_route53_zone" "main" {
-#   count = var.domain_name != null ? 1 : 0
-#   name  = var.domain_name
-# }

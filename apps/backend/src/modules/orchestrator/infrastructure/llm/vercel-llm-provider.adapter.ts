@@ -8,6 +8,7 @@ import {
 import type {
 	LlmCompletionRequest,
 	LlmCompletionResponse,
+	LlmMessage,
 	LlmProviderPort,
 	LlmStructuredRequest,
 	LlmStructuredResponse,
@@ -49,8 +50,13 @@ function mapBridgeError(operation: string, cause: unknown): LlmError {
 	if (isAbortError(cause)) {
 		return new LlmTimeoutError(extractTimeoutMs(cause) ?? 0, cause);
 	}
-	if (isRateLimitError(cause)) {
-		return new LlmRateLimitError(extractRetryAfterMs(cause), cause);
+	// ai@6 retries internally before throwing AI_RetryError, which hides the
+	// real statusCode/responseHeaders one level deeper. Inspect the unwrapped
+	// inner error so a wrapped 429 still maps to LlmRateLimitError (the agentic
+	// loop relies on that distinction to honor retry-after).
+	const effective = unwrapAiRetryError(cause);
+	if (isRateLimitError(effective)) {
+		return new LlmRateLimitError(extractRetryAfterMs(effective), cause);
 	}
 	return new LlmProviderUnavailableError(operation, cause);
 }
@@ -75,6 +81,32 @@ function extractTimeoutMs(cause: unknown): number | undefined {
 	return undefined;
 }
 
+const MAX_AI_RETRY_UNWRAP_DEPTH = 3;
+
+/**
+ * Recursively unwraps `AI_RetryError` envelopes from the ai SDK. The SDK
+ * wraps the last failed `APICallError` inside `.lastError` / `.errors[last]`,
+ * which hides `statusCode` from a top-level shape check. We bound the depth
+ * defensively so a hypothetical cyclic structure cannot stall us.
+ */
+function unwrapAiRetryError(cause: unknown, depth = 0): unknown {
+	if (depth >= MAX_AI_RETRY_UNWRAP_DEPTH) return cause;
+	if (cause === null || typeof cause !== "object") return cause;
+	const obj = cause as {
+		name?: unknown;
+		lastError?: unknown;
+		errors?: unknown;
+	};
+	if (obj.name !== "AI_RetryError") return cause;
+	const inner =
+		obj.lastError ??
+		(Array.isArray(obj.errors) && obj.errors.length > 0
+			? obj.errors[obj.errors.length - 1]
+			: undefined);
+	if (inner === undefined) return cause;
+	return unwrapAiRetryError(inner, depth + 1);
+}
+
 function isRateLimitError(cause: unknown): boolean {
 	if (cause === null || typeof cause !== "object") return false;
 	const obj = cause as { statusCode?: unknown; status?: unknown };
@@ -83,9 +115,49 @@ function isRateLimitError(cause: unknown): boolean {
 
 function extractRetryAfterMs(cause: unknown): number | undefined {
 	if (cause === null || typeof cause !== "object") return undefined;
-	const obj = cause as { retryAfterMs?: unknown };
+	const obj = cause as {
+		retryAfterMs?: unknown;
+		responseHeaders?: unknown;
+	};
 	if (typeof obj.retryAfterMs === "number") return obj.retryAfterMs;
+	// APICallError exposes the raw HTTP `retry-after` header (seconds per
+	// RFC 7231) on `responseHeaders`. Parse it best-effort.
+	if (obj.responseHeaders !== null && typeof obj.responseHeaders === "object") {
+		const headers = obj.responseHeaders as Record<string, unknown>;
+		const raw = headers["retry-after"] ?? headers["Retry-After"];
+		if (typeof raw === "string") {
+			const seconds = Number.parseFloat(raw);
+			if (Number.isFinite(seconds) && seconds >= 0) {
+				return Math.round(seconds * 1000);
+			}
+		}
+	}
 	return undefined;
+}
+
+/**
+ * Splits the domain `LlmMessage[]` into a top-level `system` string and the
+ * non-system messages the SDK accepts in `messages`. Done in the adapter (not
+ * the bridge) so the bridge stays a thin SDK proxy and other LlmProviderPort
+ * implementations can apply the same convention.
+ */
+function splitSystemMessages(messages: LlmMessage[]): {
+	system: string | undefined;
+	rest: Array<{ role: "user" | "assistant"; content: string }>;
+} {
+	const systemContents: string[] = [];
+	const rest: Array<{ role: "user" | "assistant"; content: string }> = [];
+	for (const m of messages) {
+		if (m.role === "system") {
+			systemContents.push(m.content);
+		} else {
+			rest.push({ role: m.role, content: m.content });
+		}
+	}
+	return {
+		system: systemContents.length > 0 ? systemContents.join("\n\n") : undefined,
+		rest,
+	};
 }
 
 function isZodLikeError(cause: unknown): boolean {
@@ -147,13 +219,15 @@ export class VercelLlmProviderAdapter implements LlmProviderPort {
 	): Promise<Result<LlmCompletionResponse, LlmError>> {
 		const temperature = req.temperature ?? this.defaultTemperature;
 		const timeoutMs = req.timeoutMs ?? this.defaultTimeoutMs;
+		const { system, rest } = splitSystemMessages(req.messages);
 
 		try {
 			const result = await this.bridge.generateText({
 				provider: this.provider,
 				model: this.model,
 				apiKey: this.apiKey,
-				messages: req.messages,
+				...(system !== undefined ? { system } : {}),
+				messages: rest,
 				...(req.tools !== undefined ? { tools: req.tools } : {}),
 				temperature,
 				abortSignal: AbortSignal.timeout(timeoutMs),
@@ -180,6 +254,7 @@ export class VercelLlmProviderAdapter implements LlmProviderPort {
 	): Promise<Result<LlmStructuredResponse<T>, LlmError>> {
 		const temperature = req.temperature ?? this.defaultTemperature;
 		const timeoutMs = req.timeoutMs ?? this.defaultTimeoutMs;
+		const { system, rest } = splitSystemMessages(req.messages);
 
 		let result: VercelGenerateObjectResult<T>;
 		try {
@@ -187,7 +262,8 @@ export class VercelLlmProviderAdapter implements LlmProviderPort {
 				provider: this.provider,
 				model: this.model,
 				apiKey: this.apiKey,
-				messages: req.messages,
+				...(system !== undefined ? { system } : {}),
+				messages: rest,
 				schema: req.schema,
 				temperature,
 				abortSignal: AbortSignal.timeout(timeoutMs),

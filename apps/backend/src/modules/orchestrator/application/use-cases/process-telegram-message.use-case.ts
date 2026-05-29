@@ -1,9 +1,19 @@
+import type { IntentClassifier } from "@/modules/orchestrator/application/services/intent-classifier.service";
 import {
   AGENT_FALLBACK_REPLY,
+  CLARIFICATION_PROMPTS,
+  HUMAN_ADVISOR_REPLY,
   MAX_AGENT_ITERATIONS,
+  MAX_CLARIFICATION_ATTEMPTS,
+  NON_COMMERCIAL_REPLY,
 } from "@/modules/orchestrator/domain/constants";
+import type { Category } from "@/modules/orchestrator/domain/entities/classification";
 import type { IncomingMessage } from "@/modules/orchestrator/domain/entities/incoming-message";
 import type { OutgoingReply } from "@/modules/orchestrator/domain/entities/outgoing-reply";
+import type {
+  ConversationTurn,
+  Session,
+} from "@/modules/orchestrator/domain/entities/session";
 import {
   LlmInvalidResponseError,
   LlmRateLimitError,
@@ -33,6 +43,7 @@ export interface ProcessTelegramMessageDeps {
   knowledgeBase: KnowledgeBasePort;
   llm: LlmProviderPort;
   agentTools: AgentToolPort;
+  classifier: IntentClassifier;
   /** Tools the LLM is permitted to call. Other tool calls are dropped silently. */
   allowedTools: readonly string[];
   /** Override the loop cap (mostly for tests). */
@@ -50,6 +61,7 @@ export class ProcessTelegramMessageUseCase {
   private readonly knowledgeBase: KnowledgeBasePort;
   private readonly llm: LlmProviderPort;
   private readonly agentTools: AgentToolPort;
+  private readonly classifier: IntentClassifier;
   private readonly allowedTools: ReadonlySet<string>;
   private readonly maxIterations: number;
 
@@ -59,6 +71,7 @@ export class ProcessTelegramMessageUseCase {
     this.knowledgeBase = deps.knowledgeBase;
     this.llm = deps.llm;
     this.agentTools = deps.agentTools;
+    this.classifier = deps.classifier;
     this.allowedTools = new Set(deps.allowedTools);
     this.maxIterations = deps.maxIterations ?? MAX_AGENT_ITERATIONS;
   }
@@ -78,12 +91,53 @@ export class ProcessTelegramMessageUseCase {
     });
     if (!withUserResult.ok) return withUserResult;
 
-    const drafted = await this.draftAgenticReply(message);
+    let session: Session = withUserResult.value;
 
-    const withAssistantResult = await this.sessions.appendTurn(
-      withUserResult.value,
-      { role: "assistant", content: drafted.text },
+    const classifyResult = await this.classifier.classify(
+      message.text,
+      sessionResult.value.history,
     );
+
+    let drafted: DraftedReply;
+    if (!classifyResult.ok) {
+      logger.error(
+        `Intent classification failed, falling back to static reply: ${JSON.stringify(classifyResult.error)}`,
+      );
+      drafted = {
+        text: AGENT_FALLBACK_REPLY,
+        metadata: { intent: "classifier_unavailable" },
+      };
+    } else {
+      const { category, confidence } = classifyResult.value;
+      const counterUpdate = await this.updateClarificationCounter(
+        session,
+        category,
+      );
+      if (counterUpdate.ok) {
+        session = counterUpdate.value.session;
+      }
+      const attemptsAfter = counterUpdate.ok
+        ? counterUpdate.value.attemptsAfter
+        : ((session.metadata.clarificationAttempts as number | undefined) ?? 0);
+
+      drafted = await this.draftReplyByCategory({
+        category,
+        message,
+        session,
+        attemptsAfter,
+        previousHistory: sessionResult.value.history,
+      });
+      drafted.metadata = {
+        ...drafted.metadata,
+        category,
+        confidence,
+      };
+    }
+
+    const withAssistantResult = await this.sessions.appendTurn(session, {
+      role: "assistant",
+      content: drafted.text,
+    });
     if (!withAssistantResult.ok) return withAssistantResult;
 
     const reply: OutgoingReply = {
@@ -99,6 +153,85 @@ export class ProcessTelegramMessageUseCase {
   }
 
   /**
+   * Updates `session.metadata.clarificationAttempts` based on the classified
+   * category. Returns the updated session and the post-update counter value.
+   *
+   * Why apply it before dispatch: handlers (notably `not_understood`) need to
+   * see the post-increment value to decide between asking another clarification
+   * and offering a human advisor.
+   */
+  private async updateClarificationCounter(
+    session: Session,
+    category: Category,
+  ): Promise<
+    Result<{ session: Session; attemptsAfter: number }, SessionRepositoryError>
+  > {
+    const current =
+      (session.metadata.clarificationAttempts as number | undefined) ?? 0;
+
+    let attemptsAfter: number;
+    if (category !== "not_understood") {
+      if (current === 0) return ok({ session, attemptsAfter: 0 });
+      attemptsAfter = 0;
+    } else if (current >= MAX_CLARIFICATION_ATTEMPTS) {
+      attemptsAfter = 0;
+    } else {
+      attemptsAfter = current + 1;
+    }
+
+    const updated = await this.sessions.updateMetadata(session, {
+      ...session.metadata,
+      clarificationAttempts: attemptsAfter,
+    });
+    if (!updated.ok) return updated;
+    return ok({ session: updated.value, attemptsAfter });
+  }
+
+  private async draftReplyByCategory(args: {
+    category: Category;
+    message: IncomingMessage;
+    session: Session;
+    attemptsAfter: number;
+    previousHistory: ConversationTurn[];
+  }): Promise<DraftedReply> {
+    switch (args.category) {
+      case "commercial_faq":
+      case "commercial_quotation":
+        return this.draftAgenticReply(args.message, args.previousHistory);
+
+      case "non_commercial":
+        return {
+          text: NON_COMMERCIAL_REPLY,
+          metadata: { intent: "non_commercial" },
+        };
+
+      case "not_understood": {
+        // attemptsAfter is the post-increment counter coming from
+        // `updateClarificationCounter`. For `not_understood`, the only path to
+        // `attemptsAfter === 0` is "we hit MAX_CLARIFICATION_ATTEMPTS and reset"
+        // → offer a human advisor.
+        if (args.attemptsAfter === 0) {
+          return {
+            text: HUMAN_ADVISOR_REPLY,
+            metadata: { intent: "not_understood_human_advisor" },
+          };
+        }
+        const promptIndex = Math.min(
+          args.attemptsAfter - 1,
+          CLARIFICATION_PROMPTS.length - 1,
+        );
+        return {
+          text: CLARIFICATION_PROMPTS[promptIndex]!,
+          metadata: {
+            intent: "not_understood",
+            attempt: args.attemptsAfter,
+          },
+        };
+      }
+    }
+  }
+
+  /**
    * Runs the agentic loop and returns the reply to send to the user.
    *
    * Failure modes are absorbed into a fallback reply — the public failure
@@ -108,6 +241,7 @@ export class ProcessTelegramMessageUseCase {
    */
   private async draftAgenticReply(
     message: IncomingMessage,
+    previousHistory: ConversationTurn[],
   ): Promise<DraftedReply> {
     const catalogResult = await this.knowledgeBase.getFaqCatalog();
     if (!catalogResult.ok) {
@@ -141,6 +275,10 @@ export class ProcessTelegramMessageUseCase {
 
     const messages: LlmMessage[] = [
       { role: "system", content: promptResult.value },
+      ...previousHistory.map((turn) => ({
+        role: turn.role,
+        content: turn.content,
+      })),
       { role: "user", content: message.text },
     ];
 

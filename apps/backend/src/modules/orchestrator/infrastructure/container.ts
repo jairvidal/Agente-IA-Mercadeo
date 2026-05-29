@@ -1,3 +1,4 @@
+import { IntentClassifierService } from "@/modules/orchestrator/application/services/intent-classifier.service";
 import { ProcessTelegramMessageUseCase } from "@/modules/orchestrator/application/use-cases/process-telegram-message.use-case";
 import { ALLOWED_AGENT_TOOLS } from "@/modules/orchestrator/domain/constants";
 import type { AgentToolPort } from "@/modules/orchestrator/domain/ports/agent-tool.port";
@@ -13,7 +14,12 @@ import { VercelLlmProviderAdapter } from "./llm/vercel-llm-provider.adapter";
 import { McpAgentToolAdapter } from "./mcp/mcp-agent-tool.adapter";
 import { McpKnowledgeBaseAdapter } from "./mcp/mcp-knowledge-base.adapter";
 import { SdkMcpClient } from "./mcp/sdk-mcp-client.adapter";
-import { getIoredis, IoredisAdapter } from "./persistence/ioredis.adapter";
+import {
+	getIoredis,
+	IoredisAdapter,
+	pingRedis,
+	redactRedisUrl,
+} from "./persistence/ioredis.adapter";
 import { RedisSessionRepository } from "./persistence/redis-session.repository";
 
 export interface OrchestratorModule {
@@ -152,7 +158,7 @@ function buildLlm(): LlmProviderPort {
 	return new FallbackLlmProviderAdapter(chain);
 }
 
-export function buildOrchestratorModule(): OrchestratorModule {
+export async function buildOrchestratorModule(): Promise<OrchestratorModule> {
 	const botToken = process.env.TELEGRAM_BOT_TOKEN ?? "";
 	const webhookSecret = process.env.TELEGRAM_WEBHOOK_SECRET ?? "";
 	const redisUrl = process.env.REDIS_URL ?? "";
@@ -172,8 +178,32 @@ export function buildOrchestratorModule(): OrchestratorModule {
 		throw new Error("Missing MCP_SERVER_URL or MCP_INTERNAL_TOKEN env vars");
 	}
 
+	const redis = getIoredis(redisUrl);
+	try {
+		await pingRedis(redis);
+	} catch (cause) {
+		const code =
+			cause !== null && typeof cause === "object" && "code" in cause
+				? String((cause as { code: unknown }).code)
+				: undefined;
+		const message = cause instanceof Error ? cause.message : String(cause);
+		const safeUrl = redactRedisUrl(redisUrl);
+		console.error(
+			[
+				`[boot] Redis is not reachable at ${safeUrl}${code ? ` (${code})` : ""}: ${message}`,
+				"Hint: is Redis running? Try one of:",
+				"  docker start redis-sidoc",
+				"  docker run -d --name redis-sidoc -p 6379:6379 redis:7-alpine",
+			].join("\n"),
+		);
+		throw new Error(
+			`Redis unavailable at ${safeUrl}${code ? ` (${code})` : ""}: ${message}`,
+			{ cause },
+		);
+	}
+
 	const sessions: SessionRepositoryPort = new RedisSessionRepository(
-		new IoredisAdapter(getIoredis(redisUrl)),
+		new IoredisAdapter(redis),
 	);
 
 	const mcp = new SdkMcpClient({
@@ -187,12 +217,14 @@ export function buildOrchestratorModule(): OrchestratorModule {
 	const llm: LlmProviderPort = buildLlm();
 
 	const channel = new TelegramChannelAdapter(botToken);
+	const classifier = new IntentClassifierService({ llm });
 	const useCase = new ProcessTelegramMessageUseCase({
 		channel,
 		sessions,
 		knowledgeBase,
 		llm,
 		agentTools,
+		classifier,
 		allowedTools: ALLOWED_AGENT_TOOLS,
 	});
 
