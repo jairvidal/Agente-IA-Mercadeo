@@ -3,7 +3,7 @@ import { z } from "zod";
 
 export const buildCustomerServicePrompt = (
   context = "",
-  habeasDataConsent?: boolean | null
+  habeasDataConsent?: boolean | null,
 ): string => {
   let prompt =
     "Eres el asistente virtual de *Sidoc S.A.*, una empresa colombiana de distribución " +
@@ -89,19 +89,29 @@ export const registerCustomerServicePrompt = (server: McpServer) => {
     "System prompt del agente de atención al cliente de Sidoc S.A.",
     {
       context: z.string().optional().describe("Contexto FAQ a inyectar"),
-      habeas_data_consent: z.string().optional().describe("'true' | 'false' | undefined"),
+      habeas_data_consent: z
+        .string()
+        .optional()
+        .describe("'true' | 'false' | undefined"),
     },
     ({ context, habeas_data_consent }) => {
       const consent =
-        habeas_data_consent === "true" ? true : habeas_data_consent === "false" ? false : undefined;
+        habeas_data_consent === "true"
+          ? true
+          : habeas_data_consent === "false"
+            ? false
+            : undefined;
       return {
         messages: [
           {
             role: "user",
-            content: { type: "text", text: buildCustomerServicePrompt(context ?? "", consent) },
+            content: {
+              type: "text",
+              text: buildCustomerServicePrompt(context ?? "", consent),
+            },
           },
         ],
       };
-    }
+    },
   );
 };

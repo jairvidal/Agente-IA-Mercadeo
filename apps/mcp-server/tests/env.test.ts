@@ -1,5 +1,5 @@
 import { describe, it, expect } from "bun:test";
-import { parseEnv } from "../src/env-schema.ts";
+import { parseEnv } from "../src/core/config/env-schema.ts";
 
 const VALID_ENV: Record<string, string> = {
   MCP_SERVER_PORT: "8000",

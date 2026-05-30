@@ -1,5 +1,5 @@
 import { describe, it, expect } from "bun:test";
-import { parseEnv } from "../src/env-schema.ts";
+import { parseEnv } from "../src/core/config/env-schema.ts";
 
 const VALID_ENV: Record<string, string> = {
   MCP_SERVER_PORT: "8000",
@@ -19,14 +19,19 @@ describe("MCP_INTERNAL_TOKEN env validation", () => {
   });
 
   it("throws when MCP_INTERNAL_TOKEN is shorter than 32 chars", () => {
-    expect(() => parseEnv({ ...VALID_ENV, MCP_INTERNAL_TOKEN: "short" })).toThrow();
+    expect(() =>
+      parseEnv({ ...VALID_ENV, MCP_INTERNAL_TOKEN: "short" }),
+    ).toThrow();
   });
 });
 
 describe("X-Internal-Token header validation", () => {
   const VALID_TOKEN = "a".repeat(32);
 
-  const validateToken = (req: Request, expectedToken: string): Response | null => {
+  const validateToken = (
+    req: Request,
+    expectedToken: string,
+  ): Response | null => {
     const url = new URL(req.url);
     if (url.pathname === "/health") return null;
 
