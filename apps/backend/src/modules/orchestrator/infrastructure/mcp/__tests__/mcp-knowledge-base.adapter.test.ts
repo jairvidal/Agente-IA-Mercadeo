@@ -157,4 +157,80 @@ describe("McpKnowledgeBaseAdapter", () => {
 			}
 		});
 	});
+
+	describe("getAgentSystemPrompt", () => {
+		it("maps 'faq' to the faq_agent MCP prompt", async () => {
+			mcp.getPromptImpl = async () => "FAQ_PROMPT";
+
+			const result = await kb.getAgentSystemPrompt("faq", {
+				context: "FAQ DATA",
+			});
+
+			expect(result.ok).toBe(true);
+			if (result.ok) expect(result.value).toBe("FAQ_PROMPT");
+			expect(mcp.getPromptCalls).toEqual([
+				{ name: "faq_agent", args: { context: "FAQ DATA" } },
+			]);
+		});
+
+		it("maps 'quotation' to the quotation_agent MCP prompt", async () => {
+			mcp.getPromptImpl = async () => "QUOTE_PROMPT";
+
+			const result = await kb.getAgentSystemPrompt("quotation", {
+				context: "FAQ DATA",
+				habeasDataConsent: true,
+			});
+
+			expect(result.ok).toBe(true);
+			if (result.ok) expect(result.value).toBe("QUOTE_PROMPT");
+			expect(mcp.getPromptCalls).toEqual([
+				{
+					name: "quotation_agent",
+					args: { context: "FAQ DATA", habeas_data_consent: "true" },
+				},
+			]);
+		});
+
+		it("maps habeasDataConsent=false to 'false'", async () => {
+			await kb.getAgentSystemPrompt("quotation", {
+				context: "ctx",
+				habeasDataConsent: false,
+			});
+
+			expect(mcp.getPromptCalls[0]!.args).toEqual({
+				context: "ctx",
+				habeas_data_consent: "false",
+			});
+		});
+
+		it("omits habeas_data_consent when consent is undefined", async () => {
+			await kb.getAgentSystemPrompt("faq", { context: "ctx" });
+
+			expect(mcp.getPromptCalls[0]!.args).toEqual({ context: "ctx" });
+		});
+
+		it("wraps MCP failures in KnowledgeBaseUnavailableError carrying the agent name", async () => {
+			mcp.getPromptImpl = async () => {
+				throw new McpTimeoutError(10000);
+			};
+
+			const result = await kb.getAgentSystemPrompt("faq", { context: "ctx" });
+
+			expect(result.ok).toBe(false);
+			if (!result.ok) {
+				expect(result.error).toBeInstanceOf(KnowledgeBaseUnavailableError);
+				expect(result.error.cause).toBeInstanceOf(McpTimeoutError);
+				expect(result.error.message).toContain("faq");
+			}
+		});
+
+		it("does not cache prompts (each call hits the MCP)", async () => {
+			mcp.getPromptImpl = async () => "PROMPT";
+
+			await kb.getAgentSystemPrompt("faq", { context: "ctx" });
+			await kb.getAgentSystemPrompt("faq", { context: "ctx" });
+
+			expect(mcp.getPromptCalls).toHaveLength(2);
+		});
+	});
 });
