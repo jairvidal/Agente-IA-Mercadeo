@@ -53,6 +53,7 @@ export const defaultVercelAiBridge: VercelAiBridge = {
 
 		const result = await generateText({
 			model,
+			...(params.system !== undefined ? { system: params.system } : {}),
 			messages: params.messages,
 			...(tools !== undefined ? { tools } : {}),
 			temperature: params.temperature,
@@ -82,6 +83,7 @@ export const defaultVercelAiBridge: VercelAiBridge = {
 		// the SDK overloads from leaking into our bridge contract.
 		const result = await generateObject({
 			model,
+			...(params.system !== undefined ? { system: params.system } : {}),
 			messages: params.messages,
 			schema: params.schema,
 			temperature: params.temperature,

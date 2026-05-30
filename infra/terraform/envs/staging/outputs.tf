@@ -4,7 +4,7 @@ output "vpc_id" {
 }
 
 output "public_subnet_id" {
-  description = "Public subnet ID for EC2 placement in E-00.4"
+  description = "Public subnet ID for EC2 placement"
   value       = module.network.public_subnet_ids[0]
 }
 
@@ -13,46 +13,65 @@ output "sg_ec2_id" {
   value       = module.network.sg_ec2_id
 }
 
-# output "ecr_repository_urls" {
-#   description = "ECR repository URLs (map: repo_name => url)"
-#   value       = module.registry.repository_urls
-# }
+output "ecr_repository_urls" {
+  description = "ECR repository URLs (map: repo_name => url)"
+  value       = module.registry.repository_urls
+}
 
-# output "runtime_secret_arn" {
-#   description = "ARN of the Secrets Manager runtime secret"
-#   value       = module.secrets.secret_arn
-# }
+output "runtime_secret_arn" {
+  description = "ARN of the Secrets Manager runtime secret"
+  value       = module.secrets.secret_arn
+}
 
-# output "runtime_secret_name" {
-#   description = "Name of the Secrets Manager runtime secret (use with aws secretsmanager put-secret-value)"
-#   value       = module.secrets.secret_name
-# }
+output "runtime_secret_name" {
+  description = "Name of the Secrets Manager runtime secret (use with aws secretsmanager put-secret-value)"
+  value       = module.secrets.secret_name
+}
 
-# output "dashboard_cloudfront_domain" {
-#   description = "CloudFront distribution domain for the dashboard SPA (use until custom domain is set)"
-#   value       = module.frontend.distribution_domain
-# }
+output "dashboard_bucket" {
+  description = "S3 bucket name for dashboard static assets"
+  value       = module.storage.dashboard_bucket_id
+}
 
-# output "cloudfront_distribution_id" {
-#   description = "CloudFront distribution ID (used in deploy-dashboard.yml for cache invalidation)"
-#   value       = module.frontend.distribution_id
-# }
+output "ec2_instance_profile_arn" {
+  description = "IAM instance profile ARN attached to EC2"
+  value       = module.compute.instance_profile_arn
+}
 
-# output "dashboard_bucket" {
-#   description = "S3 bucket name for dashboard static assets"
-#   value       = module.storage.dashboard_bucket_id
-# }
+output "ec2_public_ip" {
+  description = "Elastic IP of the EC2 instance — A record target for api.marketing.stg.sidocsa.com"
+  value       = module.compute.public_ip
+}
 
-# output "ec2_instance_profile_arn" {
-#   description = "IAM instance profile ARN (attached to EC2 in E-00.4)"
-#   value       = module.compute.instance_profile_arn
-# }
+output "ec2_instance_id" {
+  description = "EC2 instance ID (use with aws ssm start-session)"
+  value       = module.compute.instance_id
+}
 
-# Uncomment in E-00.4 when EC2 is launched
-# output "ec2_public_ip" {
-#   description = "Elastic IP of the EC2 instance (use for sslip.io domain: {ip}.sslip.io)"
-#   value       = module.compute.public_ip
-# }
+output "dashboard_cloudfront_domain" {
+  description = "CloudFront distribution domain — CNAME target for marketing.stg.sidocsa.com"
+  value       = module.frontend.distribution_domain
+}
+
+output "cloudfront_distribution_id" {
+  description = "CloudFront distribution ID (used by deploy-dashboard.yml for cache invalidation)"
+  value       = module.frontend.distribution_id
+}
+
+output "dashboard_acm_certificate_arn" {
+  description = "ACM cert ARN for the dashboard FQDN"
+  value       = module.frontend.acm_certificate_arn
+}
+
+output "dashboard_acm_validation_records" {
+  description = "DNS validation records for SIDOC — they create CNAME records from `name` → `value`"
+  value       = module.frontend.acm_validation_records
+}
+
+output "dashboard_acm_certificate_status" {
+  description = "ACM cert status — flip dashboard_dns_enabled=true once this becomes ISSUED"
+  value       = module.frontend.acm_certificate_status
+}
 
 # Uncomment in E-00.5 when GitHub OIDC is configured
 # output "github_actions_role_arn" {

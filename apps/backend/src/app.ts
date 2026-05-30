@@ -6,8 +6,9 @@ import { buildOrchestratorModule } from "@/modules/orchestrator/infrastructure/c
 
 const PORT = process.env.BACKEND_PORT;
 const PROJECT_NAME = process.env.PROJECT_NAME;
+const DASHBOARD_ORIGIN = process.env.DASHBOARD_ORIGIN;
 
-const orchestrator = buildOrchestratorModule();
+const orchestrator = await buildOrchestratorModule();
 
 const app = new Elysia({ name: PROJECT_NAME })
 	.onError(({ code, error, path, set }) => {
@@ -16,9 +17,16 @@ const app = new Elysia({ name: PROJECT_NAME })
 		set.status = code === "NOT_FOUND" ? 404 : 500;
 		return { error: err.message };
 	})
-	.use(cors())
+	.use(
+		cors({
+			origin: DASHBOARD_ORIGIN,
+			credentials: true,
+			allowedHeaders: ["Content-Type", "Authorization"],
+		}),
+	)
 	.use(orchestrator.routes)
 	.get("/", () => "Hello Elysia")
+	.get("/health", () => ({ status: "ok" }))
 	.listen({
 		port: Number(PORT),
 	});

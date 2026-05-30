@@ -49,6 +49,26 @@ class FakeVercelAiBridge implements VercelAiBridge {
 	}
 }
 
+/**
+ * Builds a structurally-compatible AI_RetryError. We do NOT import the SDK
+ * class because the adapter must rely on shape (`name`, `lastError`, `errors`),
+ * not on a `instanceof` check — that's what the runtime crash exposed.
+ */
+function makeAiRetryError(lastError: unknown): Error {
+	const message =
+		lastError instanceof Error
+			? `Failed after 3 attempts. Last error: ${lastError.message}`
+			: "Failed after 3 attempts.";
+	const err = new Error(message);
+	err.name = "AI_RetryError";
+	Object.assign(err, {
+		reason: "maxRetriesExceeded",
+		errors: [lastError],
+		lastError,
+	});
+	return err;
+}
+
 function makeAdapter(bridge: VercelAiBridge): VercelLlmProviderAdapter {
 	return new VercelLlmProviderAdapter(
 		{
@@ -100,10 +120,8 @@ describe("VercelLlmProviderAdapter", () => {
 			expect(call.model).toBe("gemini-2.0-flash-lite");
 			expect(call.apiKey).toBe("test-key");
 			expect(call.temperature).toBe(0.7);
-			expect(call.messages).toEqual([
-				{ role: "system", content: "you are a bot" },
-				{ role: "user", content: "hi" },
-			]);
+			expect(call.system).toBe("you are a bot");
+			expect(call.messages).toEqual([{ role: "user", content: "hi" }]);
 			expect(call.tools).toEqual([
 				{
 					name: "search_faq",
@@ -230,6 +248,134 @@ describe("VercelLlmProviderAdapter", () => {
 				expect(result.error).toBeInstanceOf(LlmProviderUnavailableError);
 			}
 		});
+
+		it("unwraps AI_RetryError wrapping a 429 into Err(LlmRateLimitError)", async () => {
+			const inner = Object.assign(new Error("Quota exceeded"), {
+				statusCode: 429,
+				retryAfterMs: 56_565,
+			});
+			bridge.generateTextImpl = async () => {
+				throw makeAiRetryError(inner);
+			};
+
+			const result = await llm.complete({ messages: [] });
+
+			expect(result.ok).toBe(false);
+			if (!result.ok) {
+				expect(result.error).toBeInstanceOf(LlmRateLimitError);
+				if (result.error instanceof LlmRateLimitError) {
+					expect(result.error.retryAfterMs).toBe(56_565);
+				}
+			}
+		});
+
+		it("regression: real-shape AI_RetryError from ai@6 (errors[] only, no retryAfterMs)", async () => {
+			// Reproduces the runtime crash from the smoke test: Gemini free tier
+			// 429 wrapped by ai@6's retry-with-exponential-backoff after 3 tries.
+			// Only `errors[]` is reliable — older SDK versions did not set
+			// `lastError`. The mapper must fall back to errors[errors.length-1].
+			const apiError = Object.assign(
+				new Error(
+					"You exceeded your current quota, please check your plan and billing details.",
+				),
+				{ statusCode: 429, isRetryable: true },
+			);
+			const retryError = new Error(
+				"Failed after 3 attempts. Last error: You exceeded your current quota...",
+			);
+			retryError.name = "AI_RetryError";
+			Object.assign(retryError, {
+				reason: "maxRetriesExceeded",
+				errors: [apiError, apiError, apiError],
+			});
+
+			bridge.generateTextImpl = async () => {
+				throw retryError;
+			};
+
+			const result = await llm.complete({ messages: [] });
+
+			expect(result.ok).toBe(false);
+			if (!result.ok) {
+				expect(result.error).toBeInstanceOf(LlmRateLimitError);
+			}
+		});
+
+		it("keeps non-429 AI_RetryError mapped to LlmProviderUnavailableError", async () => {
+			const inner = new Error("connection reset");
+			bridge.generateTextImpl = async () => {
+				throw makeAiRetryError(inner);
+			};
+
+			const result = await llm.complete({ messages: [] });
+
+			expect(result.ok).toBe(false);
+			if (!result.ok) {
+				expect(result.error).toBeInstanceOf(LlmProviderUnavailableError);
+			}
+		});
+
+		it("extracts retryAfterMs from APICallError responseHeaders 'retry-after' seconds", async () => {
+			const inner = Object.assign(new Error("rate limit"), {
+				statusCode: 429,
+				responseHeaders: { "retry-after": "57" },
+			});
+			bridge.generateTextImpl = async () => {
+				throw makeAiRetryError(inner);
+			};
+
+			const result = await llm.complete({ messages: [] });
+
+			expect(result.ok).toBe(false);
+			if (!result.ok) {
+				expect(result.error).toBeInstanceOf(LlmRateLimitError);
+				if (result.error instanceof LlmRateLimitError) {
+					expect(result.error.retryAfterMs).toBe(57_000);
+				}
+			}
+		});
+
+		it("extracts system messages and passes them as the `system` param", async () => {
+			bridge.generateTextImpl = async () => ({
+				text: "ok",
+				usage: { inputTokens: 1, outputTokens: 1 },
+			});
+
+			await llm.complete({
+				messages: [
+					{ role: "system", content: "you are a bot" },
+					{ role: "user", content: "hi" },
+				],
+			});
+
+			const call = bridge.generateTextCalls[0]!;
+			expect(call.system).toBe("you are a bot");
+			expect(call.messages).toEqual([{ role: "user", content: "hi" }]);
+		});
+
+		it("concatenates multiple system messages with `\\n\\n`", async () => {
+			await llm.complete({
+				messages: [
+					{ role: "system", content: "first" },
+					{ role: "system", content: "second" },
+					{ role: "user", content: "hi" },
+				],
+			});
+
+			const call = bridge.generateTextCalls[0]!;
+			expect(call.system).toBe("first\n\nsecond");
+			expect(call.messages).toEqual([{ role: "user", content: "hi" }]);
+		});
+
+		it("omits the `system` param when there are no system messages", async () => {
+			await llm.complete({
+				messages: [{ role: "user", content: "hi" }],
+			});
+
+			const call = bridge.generateTextCalls[0]!;
+			expect(call.system).toBeUndefined();
+			expect(call.messages).toEqual([{ role: "user", content: "hi" }]);
+		});
 	});
 
 	describe("completeStructured()", () => {
@@ -327,6 +473,68 @@ describe("VercelLlmProviderAdapter", () => {
 				expect(result.error).toBeInstanceOf(LlmProviderUnavailableError);
 				expect(result.error.message).toContain("completeStructured");
 			}
+		});
+
+		it("unwraps AI_RetryError wrapping a 429 into Err(LlmRateLimitError)", async () => {
+			const inner = Object.assign(new Error("quota exceeded"), {
+				statusCode: 429,
+			});
+			bridge.generateObjectImpl = async () => {
+				throw makeAiRetryError(inner);
+			};
+
+			const result = await llm.completeStructured({
+				messages: [],
+				schema: {},
+			});
+
+			expect(result.ok).toBe(false);
+			if (!result.ok) {
+				expect(result.error).toBeInstanceOf(LlmRateLimitError);
+			}
+		});
+
+		it("keeps non-429 AI_RetryError mapped to LlmProviderUnavailableError", async () => {
+			const inner = new Error("upstream 503");
+			bridge.generateObjectImpl = async () => {
+				throw makeAiRetryError(inner);
+			};
+
+			const result = await llm.completeStructured({
+				messages: [],
+				schema: {},
+			});
+
+			expect(result.ok).toBe(false);
+			if (!result.ok) {
+				expect(result.error).toBeInstanceOf(LlmProviderUnavailableError);
+			}
+		});
+
+		it("extracts system messages and passes them as the `system` param", async () => {
+			await llm.completeStructured({
+				messages: [
+					{ role: "system", content: "you are a classifier" },
+					{ role: "user", content: "classify this" },
+				],
+				schema: {},
+			});
+
+			const call = bridge.generateObjectCalls[0]!;
+			expect(call.system).toBe("you are a classifier");
+			expect(call.messages).toEqual([
+				{ role: "user", content: "classify this" },
+			]);
+		});
+
+		it("omits the `system` param when there are no system messages", async () => {
+			await llm.completeStructured({
+				messages: [{ role: "user", content: "hi" }],
+				schema: {},
+			});
+
+			const call = bridge.generateObjectCalls[0]!;
+			expect(call.system).toBeUndefined();
 		});
 	});
 });

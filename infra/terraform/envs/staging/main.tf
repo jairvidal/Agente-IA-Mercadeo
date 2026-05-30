@@ -55,16 +55,18 @@ module "compute" {
   # ami_id set in E-00.4 — verify latest Ubuntu 22.04 ARM64 AMI in us-east-1 before applying
 }
 
-# Step 4 — CloudFront + OAC for dashboard SPA
-#           domain_name and acm_cert_arn null until SIDOC confirms domain
+# Step 4 — CloudFront + OAC + ACM for dashboard SPA
+#           ACM cert created in PENDING state on first apply. Validation CNAME
+#           lives in module output, gets sent to SIDOC. Once they add it and the
+#           cert is ISSUED, flip dashboard_dns_enabled = true to attach aliases.
 module "frontend" {
   source                           = "../../modules/frontend"
   name_prefix                      = local.name_prefix
   env                              = local.env
   dashboard_bucket_id              = module.storage.dashboard_bucket_id
   dashboard_bucket_regional_domain = module.storage.dashboard_bucket_regional_domain
-  domain_name                      = var.domain_name
-  acm_cert_arn                     = null
+  dashboard_fqdn                   = var.dashboard_fqdn
+  dashboard_dns_enabled            = var.dashboard_dns_enabled
 }
 
 # Step 5 — CloudWatch observability — TODO E-00.6

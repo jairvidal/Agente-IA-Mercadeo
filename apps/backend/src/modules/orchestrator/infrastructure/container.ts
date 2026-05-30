@@ -1,5 +1,10 @@
+import { MapAgentRegistry } from "@/modules/orchestrator/application/agents/agent-registry";
+import { FaqAgent } from "@/modules/orchestrator/application/agents/faq-agent";
+import { QuotationAgent } from "@/modules/orchestrator/application/agents/quotation-agent";
+import { IntentClassifierService } from "@/modules/orchestrator/application/services/intent-classifier.service";
+import { HandleHabeasDataConsentUseCase } from "@/modules/orchestrator/application/use-cases/handle-habeas-data-consent.use-case";
 import { ProcessTelegramMessageUseCase } from "@/modules/orchestrator/application/use-cases/process-telegram-message.use-case";
-import { ALLOWED_AGENT_TOOLS } from "@/modules/orchestrator/domain/constants";
+import { FAQ_AGENT_TOOLS, QUOTATION_AGENT_TOOLS } from "@/modules/orchestrator/domain/constants";
 import type { AgentToolPort } from "@/modules/orchestrator/domain/ports/agent-tool.port";
 import type { KnowledgeBasePort } from "@/modules/orchestrator/domain/ports/knowledge-base.port";
 import type { LlmProviderPort } from "@/modules/orchestrator/domain/ports/llm-provider.port";
@@ -13,7 +18,12 @@ import { VercelLlmProviderAdapter } from "./llm/vercel-llm-provider.adapter";
 import { McpAgentToolAdapter } from "./mcp/mcp-agent-tool.adapter";
 import { McpKnowledgeBaseAdapter } from "./mcp/mcp-knowledge-base.adapter";
 import { SdkMcpClient } from "./mcp/sdk-mcp-client.adapter";
-import { getIoredis, IoredisAdapter } from "./persistence/ioredis.adapter";
+import {
+	getIoredis,
+	IoredisAdapter,
+	pingRedis,
+	redactRedisUrl,
+} from "./persistence/ioredis.adapter";
 import { RedisSessionRepository } from "./persistence/redis-session.repository";
 
 export interface OrchestratorModule {
@@ -23,11 +33,7 @@ export interface OrchestratorModule {
 	llm: LlmProviderPort;
 }
 
-const VALID_PROVIDERS: readonly LlmProviderType[] = [
-	"openai",
-	"anthropic",
-	"gemini",
-];
+const VALID_PROVIDERS: readonly LlmProviderType[] = ["openai", "anthropic", "gemini"];
 
 function isLlmProvider(value: string): value is LlmProviderType {
 	return (VALID_PROVIDERS as readonly string[]).includes(value);
@@ -94,9 +100,7 @@ function readFallbackChain(primary: LlmConfig): LlmConfig[] {
 		.filter(Boolean)) {
 		const [provider, model] = entry.split(":");
 		if (!provider || !model) {
-			throw new Error(
-				`Invalid LLM_FALLBACK_CHAIN entry "${entry}". Expected "provider:model".`,
-			);
+			throw new Error(`Invalid LLM_FALLBACK_CHAIN entry "${entry}". Expected "provider:model".`);
 		}
 		if (!isLlmProvider(provider)) {
 			throw new Error(
@@ -110,9 +114,7 @@ function readFallbackChain(primary: LlmConfig): LlmConfig[] {
 		}
 		const apiKey = apiKeyForProvider(provider);
 		if (!apiKey) {
-			throw new Error(
-				`LLM_FALLBACK_CHAIN entry "${entry}" needs the API key for ${provider}.`,
-			);
+			throw new Error(`LLM_FALLBACK_CHAIN entry "${entry}" needs the API key for ${provider}.`);
 		}
 		chain.push({ provider, model, apiKey });
 	}
@@ -152,7 +154,7 @@ function buildLlm(): LlmProviderPort {
 	return new FallbackLlmProviderAdapter(chain);
 }
 
-export function buildOrchestratorModule(): OrchestratorModule {
+export async function buildOrchestratorModule(): Promise<OrchestratorModule> {
 	const botToken = process.env.TELEGRAM_BOT_TOKEN ?? "";
 	const webhookSecret = process.env.TELEGRAM_WEBHOOK_SECRET ?? "";
 	const redisUrl = process.env.REDIS_URL ?? "";
@@ -161,9 +163,7 @@ export function buildOrchestratorModule(): OrchestratorModule {
 	const mcpTimeoutMs = Number(process.env.MCP_TIMEOUT_MS ?? 10_000);
 
 	if (!botToken || !webhookSecret) {
-		throw new Error(
-			"Missing TELEGRAM_BOT_TOKEN or TELEGRAM_WEBHOOK_SECRET env vars",
-		);
+		throw new Error("Missing TELEGRAM_BOT_TOKEN or TELEGRAM_WEBHOOK_SECRET env vars");
 	}
 	if (!redisUrl) {
 		throw new Error("Missing REDIS_URL env var");
@@ -172,9 +172,30 @@ export function buildOrchestratorModule(): OrchestratorModule {
 		throw new Error("Missing MCP_SERVER_URL or MCP_INTERNAL_TOKEN env vars");
 	}
 
-	const sessions: SessionRepositoryPort = new RedisSessionRepository(
-		new IoredisAdapter(getIoredis(redisUrl)),
-	);
+	const redis = getIoredis(redisUrl);
+	try {
+		await pingRedis(redis);
+	} catch (cause) {
+		const code =
+			cause !== null && typeof cause === "object" && "code" in cause
+				? String((cause as { code: unknown }).code)
+				: undefined;
+		const message = cause instanceof Error ? cause.message : String(cause);
+		const safeUrl = redactRedisUrl(redisUrl);
+		console.error(
+			[
+				`[boot] Redis is not reachable at ${safeUrl}${code ? ` (${code})` : ""}: ${message}`,
+				"Hint: is Redis running? Try one of:",
+				"  docker start redis-sidoc",
+				"  docker run -d --name redis-sidoc -p 6379:6379 redis:7-alpine",
+			].join("\n"),
+		);
+		throw new Error(`Redis unavailable at ${safeUrl}${code ? ` (${code})` : ""}: ${message}`, {
+			cause,
+		});
+	}
+
+	const sessions: SessionRepositoryPort = new RedisSessionRepository(new IoredisAdapter(redis));
 
 	const mcp = new SdkMcpClient({
 		url: mcpUrl,
@@ -187,13 +208,33 @@ export function buildOrchestratorModule(): OrchestratorModule {
 	const llm: LlmProviderPort = buildLlm();
 
 	const channel = new TelegramChannelAdapter(botToken);
+	const classifier = new IntentClassifierService({ llm });
+
+	const faqAgent = new FaqAgent({
+		llm,
+		agentTools,
+		knowledgeBase,
+		allowedTools: new Set<string>(FAQ_AGENT_TOOLS),
+	});
+	const quotationAgent = new QuotationAgent({
+		llm,
+		agentTools,
+		knowledgeBase,
+		allowedTools: new Set<string>(QUOTATION_AGENT_TOOLS),
+	});
+	const registry = new MapAgentRegistry({
+		faq: faqAgent,
+		quotation: quotationAgent,
+	});
+
+	const consent = new HandleHabeasDataConsentUseCase({ sessions });
+
 	const useCase = new ProcessTelegramMessageUseCase({
 		channel,
 		sessions,
-		knowledgeBase,
-		llm,
-		agentTools,
-		allowedTools: ALLOWED_AGENT_TOOLS,
+		classifier,
+		registry,
+		consent,
 	});
 
 	return {
