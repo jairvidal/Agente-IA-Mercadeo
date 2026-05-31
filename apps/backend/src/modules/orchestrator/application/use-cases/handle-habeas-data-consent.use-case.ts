@@ -90,10 +90,10 @@ export interface HandleHabeasDataConsentDeps {
  *   2. Awaiting + affirmative → mark accepted, return ack.
  *   3. Awaiting + negative   → mark denied, return ack.
  *   4. Awaiting + ambiguous  → re-prompt, do NOT touch metadata.
- *   5. First message ever (`history.length === 0`) → show consent text,
- *      mark `awaitingHabeasConsent=true`.
- *   6. Otherwise (history but no consent state — should not normally happen,
- *      kept for parity with the legacy handler) → `handled=false`.
+ *   5. Otherwise (no consent state yet, regardless of history) → show consent
+ *      text and mark `awaitingHabeasConsent=true`. This covers both brand-new
+ *      sessions AND legacy sessions that pre-date this gate, so existing users
+ *      are forced through the consent flow on their next message.
  */
 export class HandleHabeasDataConsentUseCase {
 	private readonly sessions: SessionRepositoryPort;
@@ -145,19 +145,15 @@ export class HandleHabeasDataConsentUseCase {
 			return ok({ handled: true, response: AMBIGUOUS_REPLY, session });
 		}
 
-		if (session.history.length === 0) {
-			const updated = await this.sessions.updateMetadata(session, {
-				...session.metadata,
-				awaitingHabeasConsent: true,
-			});
-			if (!updated.ok) return updated;
-			return ok({
-				handled: true,
-				response: DEFAULT_CONSENT_TEXT,
-				session: updated.value,
-			});
-		}
-
-		return ok({ handled: false, session });
+		const updated = await this.sessions.updateMetadata(session, {
+			...session.metadata,
+			awaitingHabeasConsent: true,
+		});
+		if (!updated.ok) return updated;
+		return ok({
+			handled: true,
+			response: DEFAULT_CONSENT_TEXT,
+			session: updated.value,
+		});
 	}
 }
