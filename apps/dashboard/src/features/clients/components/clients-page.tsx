@@ -15,13 +15,25 @@ import { ClientsTable } from "./clients-table";
 
 export function ClientsPage() {
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const [editingClient, setEditingClient] = useState<Client | null>(null);
   const { data: clients = [], isLoading } = useClients();
   const deleteClient = useDeleteClient();
+
+  const handleEdit = (client: Client) => {
+    setEditingClient(client);
+  };
 
   const handleDelete = (client: Client) => {
     // TODO: Replace window.confirm with custom delete dialog (commit 5 of HU-FE-005)
     if (!window.confirm(`¿Eliminar a ${client.name}?`)) return;
     deleteClient.mutate(client.id);
+  };
+
+  const handleDialogChange = (open: boolean) => {
+    if (!open) {
+      setCreateDialogOpen(false);
+      setEditingClient(null);
+    }
   };
 
   return (
@@ -43,12 +55,17 @@ export function ClientsPage() {
       ) : clients.length === 0 ? (
         <ClientsEmpty />
       ) : (
-        <ClientsTable data={clients} onDelete={handleDelete} />
+        <ClientsTable
+          data={clients}
+          onEdit={handleEdit}
+          onDelete={handleDelete}
+        />
       )}
 
       <ClientFormDialog
-        open={createDialogOpen}
-        onOpenChange={setCreateDialogOpen}
+        open={createDialogOpen || editingClient !== null}
+        onOpenChange={handleDialogChange}
+        client={editingClient ?? undefined}
       />
     </div>
   );

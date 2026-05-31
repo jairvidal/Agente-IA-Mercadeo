@@ -5,7 +5,7 @@ import {
   useReactTable,
   type ColumnDef,
 } from "@tanstack/react-table";
-import { Trash2 } from "lucide-react";
+import { Pencil, Trash2 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -14,12 +14,13 @@ import type { Client } from "../schemas/client-schema";
 
 interface ClientsTableProps {
   data: Client[];
+  onEdit: (client: Client) => void;
   onDelete: (client: Client) => void;
 }
 
 type ColumnMeta = { className?: string };
 
-export function ClientsTable({ data, onDelete }: ClientsTableProps) {
+export function ClientsTable({ data, onEdit, onDelete }: ClientsTableProps) {
   const columns = useMemo<ColumnDef<Client>[]>(
     () => [
       {
@@ -73,7 +74,16 @@ export function ClientsTable({ data, onDelete }: ClientsTableProps) {
         id: "actions",
         header: () => null,
         cell: ({ row }) => (
-          <div className="text-right">
+          <div className="flex justify-end gap-1">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => onEdit(row.original)}
+              className="text-muted-foreground hover:text-foreground"
+              aria-label={`Editar ${row.original.name}`}
+            >
+              <Pencil className="h-4 w-4" />
+            </Button>
             <Button
               variant="ghost"
               size="icon"
@@ -87,7 +97,7 @@ export function ClientsTable({ data, onDelete }: ClientsTableProps) {
         ),
       },
     ],
-    [onDelete],
+    [onEdit, onDelete],
   );
 
   const table = useReactTable({

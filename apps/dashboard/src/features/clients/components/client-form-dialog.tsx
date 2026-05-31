@@ -13,6 +13,7 @@ import {
 import { Input } from "@/components/ui/input";
 
 import { useCreateClient } from "../hooks/use-create-client";
+import { useUpdateClient } from "../hooks/use-update-client";
 import {
   clientCreateSchema,
   type Client,
@@ -22,9 +23,7 @@ import {
 interface ClientFormDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  // Reserved for edit mode — activated in HU-FE-005 commit 3.
-  // Keeping the prop in the public contract from commit 1 avoids signature
-  // churn between commits; the implementation that consumes it lands later.
+  // When defined → edit mode; when undefined → create mode.
   client?: Client;
 }
 
@@ -35,13 +34,29 @@ const EMPTY_FORM: ClientCreateInput = {
   phone: "",
 };
 
+function clientToFormValues(client: Client): ClientCreateInput {
+  return {
+    name: client.name,
+    email: client.email ?? "",
+    company: client.company ?? "",
+    phone: client.phone ?? "",
+  };
+}
+
 export function ClientFormDialog({
   open,
   onOpenChange,
-  client: _client,
+  client,
 }: ClientFormDialogProps) {
-  const createClient = useCreateClient();
+  const isEdit = !!client;
+  const createMutation = useCreateClient();
+  const updateMutation = useUpdateClient();
+  const isPending = isEdit ? updateMutation.isPending : createMutation.isPending;
 
+  // Use clientCreateSchema (not clientUpdateSchema) in both modes:
+  // - The form always returns all 4 fields (RHF defaultValues are strings, not undefined)
+  // - In edit mode, allowing empty name (via partial) would let users save nameless clients
+  // - clientUpdateSchema is still used for backend contract typing (PATCH semantically partial)
   const {
     register,
     handleSubmit,
@@ -50,29 +65,45 @@ export function ClientFormDialog({
   } = useForm<ClientCreateInput>({
     resolver: zodResolver(clientCreateSchema),
     mode: "onChange",
-    defaultValues: EMPTY_FORM,
+    defaultValues: client ? clientToFormValues(client) : EMPTY_FORM,
   });
 
   useEffect(() => {
-    if (!open) {
+    if (open) {
+      reset(client ? clientToFormValues(client) : EMPTY_FORM);
+    } else {
       reset(EMPTY_FORM);
     }
-  }, [open, reset]);
+  }, [open, client, reset]);
 
   const onSubmit = (data: ClientCreateInput) => {
-    createClient.mutate(data, {
-      onSuccess: () => {
-        reset(EMPTY_FORM);
-        onOpenChange(false);
-      },
-    });
+    if (client) {
+      updateMutation.mutate(
+        { id: client.id, payload: data },
+        { onSuccess: () => onOpenChange(false) },
+      );
+    } else {
+      createMutation.mutate(data, {
+        onSuccess: () => onOpenChange(false),
+      });
+    }
   };
+
+  const submitLabel = isEdit
+    ? isPending
+      ? "Guardando…"
+      : "Guardar cambios"
+    : isPending
+      ? "Creando…"
+      : "Crear";
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Nuevo cliente</DialogTitle>
+          <DialogTitle>
+            {isEdit ? "Editar cliente" : "Nuevo cliente"}
+          </DialogTitle>
         </DialogHeader>
         <form
           onSubmit={handleSubmit(onSubmit)}
@@ -160,11 +191,8 @@ export function ClientFormDialog({
           </div>
 
           <DialogFooter>
-            <Button
-              type="submit"
-              disabled={!isValid || createClient.isPending}
-            >
-              {createClient.isPending ? "Creando…" : "Crear"}
+            <Button type="submit" disabled={!isValid || isPending}>
+              {submitLabel}
             </Button>
           </DialogFooter>
         </form>
