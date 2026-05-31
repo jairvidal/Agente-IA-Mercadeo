@@ -2,11 +2,13 @@ import { useMemo } from "react";
 import {
   flexRender,
   getCoreRowModel,
+  getPaginationRowModel,
   getSortedRowModel,
   useReactTable,
   type Column,
   type ColumnDef,
   type OnChangeFn,
+  type PaginationState,
   type SortingState,
 } from "@tanstack/react-table";
 import { ArrowDown, ArrowUp, ArrowUpDown, Pencil, Trash2 } from "lucide-react";
@@ -16,10 +18,14 @@ import { Button } from "@/components/ui/button";
 
 import type { Client } from "../schemas/client-schema";
 
+import { ClientsPagination } from "./clients-pagination";
+
 interface ClientsTableProps {
   data: Client[];
   sorting: SortingState;
   onSortingChange: OnChangeFn<SortingState>;
+  pagination: PaginationState;
+  onPaginationChange: OnChangeFn<PaginationState>;
   onEdit: (client: Client) => void;
   onDelete: (client: Client) => void;
 }
@@ -59,6 +65,8 @@ export function ClientsTable({
   data,
   sorting,
   onSortingChange,
+  pagination,
+  onPaginationChange,
   onEdit,
   onDelete,
 }: ClientsTableProps) {
@@ -147,10 +155,12 @@ export function ClientsTable({
   const table = useReactTable({
     data,
     columns,
-    state: { sorting },
+    state: { sorting, pagination },
     onSortingChange,
+    onPaginationChange,
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
+    getPaginationRowModel: getPaginationRowModel(),
   });
 
   return (
@@ -202,6 +212,7 @@ export function ClientsTable({
           ))}
         </tbody>
       </table>
+      {table.getPageCount() > 1 && <ClientsPagination table={table} />}
     </div>
   );
 }

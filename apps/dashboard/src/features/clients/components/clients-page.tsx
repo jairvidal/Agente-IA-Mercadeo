@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { Plus, Search, Users } from "lucide-react";
-import type { SortingState } from "@tanstack/react-table";
+import type { PaginationState, SortingState } from "@tanstack/react-table";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,6 +11,7 @@ import { useDeleteClient } from "../hooks/use-delete-client";
 import { searchClients } from "../lib/search-clients";
 import type { Client } from "../schemas/client-schema";
 
+import { ClientDeleteDialog } from "./client-delete-dialog";
 import { ClientFormDialog } from "./client-form-dialog";
 import { ClientsEmpty } from "./clients-empty";
 import { ClientsSkeleton } from "./clients-skeleton";
@@ -19,10 +20,15 @@ import { ClientsTable } from "./clients-table";
 export function ClientsPage() {
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [editingClient, setEditingClient] = useState<Client | null>(null);
+  const [deletingClient, setDeletingClient] = useState<Client | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [sorting, setSorting] = useState<SortingState>([
     { id: "name", desc: false },
   ]);
+  const [pagination, setPagination] = useState<PaginationState>({
+    pageIndex: 0,
+    pageSize: 10,
+  });
   const { data: clients = [], isLoading } = useClients();
   const deleteClient = useDeleteClient();
 
@@ -31,20 +37,36 @@ export function ClientsPage() {
     [clients, searchQuery],
   );
 
+  const handleSearchChange = (value: string) => {
+    setSearchQuery(value);
+    setPagination((p) => ({ ...p, pageIndex: 0 }));
+  };
+
   const handleEdit = (client: Client) => {
     setEditingClient(client);
   };
 
   const handleDelete = (client: Client) => {
-    // TODO: Replace window.confirm with custom delete dialog (commit 5 of HU-FE-005)
-    if (!window.confirm(`¿Eliminar a ${client.name}?`)) return;
-    deleteClient.mutate(client.id);
+    setDeletingClient(client);
   };
 
-  const handleDialogChange = (open: boolean) => {
+  const handleConfirmDelete = () => {
+    if (!deletingClient) return;
+    deleteClient.mutate(deletingClient.id, {
+      onSettled: () => setDeletingClient(null),
+    });
+  };
+
+  const handleFormDialogChange = (open: boolean) => {
     if (!open) {
       setCreateDialogOpen(false);
       setEditingClient(null);
+    }
+  };
+
+  const handleDeleteDialogChange = (open: boolean) => {
+    if (!open) {
+      setDeletingClient(null);
     }
   };
 
@@ -68,7 +90,7 @@ export function ClientsPage() {
           type="search"
           placeholder="Buscar por nombre, empresa o email…"
           value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
+          onChange={(e) => handleSearchChange(e.target.value)}
           className="pl-9"
           aria-label="Buscar clientes"
         />
@@ -85,6 +107,8 @@ export function ClientsPage() {
           data={filteredClients}
           sorting={sorting}
           onSortingChange={setSorting}
+          pagination={pagination}
+          onPaginationChange={setPagination}
           onEdit={handleEdit}
           onDelete={handleDelete}
         />
@@ -92,8 +116,15 @@ export function ClientsPage() {
 
       <ClientFormDialog
         open={createDialogOpen || editingClient !== null}
-        onOpenChange={handleDialogChange}
+        onOpenChange={handleFormDialogChange}
         client={editingClient ?? undefined}
+      />
+
+      <ClientDeleteDialog
+        client={deletingClient}
+        onOpenChange={handleDeleteDialogChange}
+        onConfirm={handleConfirmDelete}
+        isPending={deleteClient.isPending}
       />
     </div>
   );
