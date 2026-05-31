@@ -1,11 +1,14 @@
-import { useState } from "react";
-import { Plus, Users } from "lucide-react";
+import { useMemo, useState } from "react";
+import { Plus, Search, Users } from "lucide-react";
+import type { SortingState } from "@tanstack/react-table";
 
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { PageHeader } from "@/components/ui/page-header";
 
 import { useClients } from "../hooks/use-clients";
 import { useDeleteClient } from "../hooks/use-delete-client";
+import { searchClients } from "../lib/search-clients";
 import type { Client } from "../schemas/client-schema";
 
 import { ClientFormDialog } from "./client-form-dialog";
@@ -16,8 +19,17 @@ import { ClientsTable } from "./clients-table";
 export function ClientsPage() {
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [editingClient, setEditingClient] = useState<Client | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [sorting, setSorting] = useState<SortingState>([
+    { id: "name", desc: false },
+  ]);
   const { data: clients = [], isLoading } = useClients();
   const deleteClient = useDeleteClient();
+
+  const filteredClients = useMemo(
+    () => searchClients(clients, searchQuery),
+    [clients, searchQuery],
+  );
 
   const handleEdit = (client: Client) => {
     setEditingClient(client);
@@ -50,13 +62,29 @@ export function ClientsPage() {
         }
       />
 
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <Input
+          type="search"
+          placeholder="Buscar por nombre, empresa o email…"
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="pl-9"
+          aria-label="Buscar clientes"
+        />
+      </div>
+
       {isLoading ? (
         <ClientsSkeleton />
       ) : clients.length === 0 ? (
-        <ClientsEmpty />
+        <ClientsEmpty variant="empty" />
+      ) : filteredClients.length === 0 ? (
+        <ClientsEmpty variant="no-results" />
       ) : (
         <ClientsTable
-          data={clients}
+          data={filteredClients}
+          sorting={sorting}
+          onSortingChange={setSorting}
           onEdit={handleEdit}
           onDelete={handleDelete}
         />

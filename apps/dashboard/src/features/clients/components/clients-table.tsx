@@ -2,10 +2,14 @@ import { useMemo } from "react";
 import {
   flexRender,
   getCoreRowModel,
+  getSortedRowModel,
   useReactTable,
+  type Column,
   type ColumnDef,
+  type OnChangeFn,
+  type SortingState,
 } from "@tanstack/react-table";
-import { Pencil, Trash2 } from "lucide-react";
+import { ArrowDown, ArrowUp, ArrowUpDown, Pencil, Trash2 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -14,25 +18,62 @@ import type { Client } from "../schemas/client-schema";
 
 interface ClientsTableProps {
   data: Client[];
+  sorting: SortingState;
+  onSortingChange: OnChangeFn<SortingState>;
   onEdit: (client: Client) => void;
   onDelete: (client: Client) => void;
 }
 
 type ColumnMeta = { className?: string };
 
-export function ClientsTable({ data, onEdit, onDelete }: ClientsTableProps) {
+function SortIcon({ sorted }: { sorted: false | "asc" | "desc" }) {
+  if (sorted === "asc") return <ArrowUp className="h-3 w-3" />;
+  if (sorted === "desc") return <ArrowDown className="h-3 w-3" />;
+  return <ArrowUpDown className="h-3 w-3 text-muted-foreground/50" />;
+}
+
+function nextDirectionLabel(sorted: false | "asc" | "desc"): string {
+  return sorted === "asc" ? "descendente" : "ascendente";
+}
+
+interface SortableHeaderProps {
+  label: string;
+  column: Column<Client, unknown>;
+}
+
+function SortableHeader({ label, column }: SortableHeaderProps) {
+  return (
+    <button
+      type="button"
+      onClick={() => column.toggleSorting()}
+      className="flex items-center gap-1 hover:text-foreground"
+      aria-label={`Ordenar por ${label.toLowerCase()} (${nextDirectionLabel(column.getIsSorted())})`}
+    >
+      {label}
+      <SortIcon sorted={column.getIsSorted()} />
+    </button>
+  );
+}
+
+export function ClientsTable({
+  data,
+  sorting,
+  onSortingChange,
+  onEdit,
+  onDelete,
+}: ClientsTableProps) {
   const columns = useMemo<ColumnDef<Client>[]>(
     () => [
       {
         accessorKey: "name",
-        header: "Nombre",
+        header: ({ column }) => <SortableHeader label="Nombre" column={column} />,
         cell: ({ getValue }) => (
           <span className="font-medium text-foreground">{getValue<string>()}</span>
         ),
       },
       {
         accessorKey: "company",
-        header: "Empresa",
+        header: ({ column }) => <SortableHeader label="Empresa" column={column} />,
         cell: ({ getValue }) => (
           <span className="text-muted-foreground">
             {getValue<string | null>() ?? "—"}
@@ -42,7 +83,7 @@ export function ClientsTable({ data, onEdit, onDelete }: ClientsTableProps) {
       },
       {
         accessorKey: "email",
-        header: "Email",
+        header: ({ column }) => <SortableHeader label="Email" column={column} />,
         cell: ({ getValue }) => (
           <span className="text-muted-foreground">
             {getValue<string | null>() ?? "—"}
@@ -52,7 +93,7 @@ export function ClientsTable({ data, onEdit, onDelete }: ClientsTableProps) {
       },
       {
         accessorKey: "status",
-        header: "Estado",
+        header: ({ column }) => <SortableHeader label="Estado" column={column} />,
         cell: ({ getValue }) => {
           const status = getValue<Client["status"]>();
           return (
@@ -64,7 +105,9 @@ export function ClientsTable({ data, onEdit, onDelete }: ClientsTableProps) {
       },
       {
         id: "quotes",
-        header: "Cotizaciones",
+        header: ({ column }) => (
+          <SortableHeader label="Cotizaciones" column={column} />
+        ),
         accessorFn: (row) => row._count.quotes,
         cell: ({ getValue }) => (
           <span className="text-muted-foreground">{getValue<number>()}</span>
@@ -73,6 +116,7 @@ export function ClientsTable({ data, onEdit, onDelete }: ClientsTableProps) {
       {
         id: "actions",
         header: () => null,
+        enableSorting: false,
         cell: ({ row }) => (
           <div className="flex justify-end gap-1">
             <Button
@@ -103,7 +147,10 @@ export function ClientsTable({ data, onEdit, onDelete }: ClientsTableProps) {
   const table = useReactTable({
     data,
     columns,
+    state: { sorting },
+    onSortingChange,
     getCoreRowModel: getCoreRowModel(),
+    getSortedRowModel: getSortedRowModel(),
   });
 
   return (
