@@ -1,5 +1,6 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
+import { PERSONA_HEADER } from "./persona";
 
 /**
  * Quotation-agent system prompt.
@@ -13,17 +14,11 @@ import { z } from "zod";
  */
 export const buildQuotationAgentPrompt = (
   context = "",
-  habeasDataConsent?: boolean | null
+  habeasDataConsent?: boolean | null,
 ): string => {
   let prompt =
-    "Eres el asistente virtual comercial de *Sidoc S.A.*, una empresa colombiana de " +
-    "distribución de acero y materiales para construcción. Estás especializado en " +
-    "procesar SOLICITUDES DE COTIZACIÓN.\n\n" +
-    "PERSONALIDAD:\n" +
-    "- Profesional, amable y conciso\n" +
-    "- Usas español colombiano natural\n" +
-    "- Respuestas cortas: máximo 3-4 oraciones por mensaje\n" +
-    "- Tratas al usuario de 'usted'\n\n" +
+    PERSONA_HEADER +
+    "Como agente comercial, estás especializado en procesar SOLICITUDES DE COTIZACIÓN.\n\n" +
     "ALCANCE:\n" +
     "- Tu meta es cerrar una cotización: recolectar los datos necesarios e invocar\n" +
     "  `process_quote` cuando estén completos.\n" +
@@ -86,18 +81,11 @@ export const registerQuotationAgentPrompt = (server: McpServer) => {
     "System prompt del agente de cotización de Sidoc S.A. (cierre comercial)",
     {
       context: z.string().optional().describe("Contexto FAQ a inyectar"),
-      habeas_data_consent: z
-        .string()
-        .optional()
-        .describe("'true' | 'false' | undefined"),
+      habeas_data_consent: z.string().optional().describe("'true' | 'false' | undefined"),
     },
     ({ context, habeas_data_consent }) => {
       const consent =
-        habeas_data_consent === "true"
-          ? true
-          : habeas_data_consent === "false"
-            ? false
-            : undefined;
+        habeas_data_consent === "true" ? true : habeas_data_consent === "false" ? false : undefined;
       return {
         messages: [
           {
@@ -109,6 +97,6 @@ export const registerQuotationAgentPrompt = (server: McpServer) => {
           },
         ],
       };
-    }
+    },
   );
 };

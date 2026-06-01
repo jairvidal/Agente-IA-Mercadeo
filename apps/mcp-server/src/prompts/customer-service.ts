@@ -1,18 +1,13 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
+import { PERSONA_HEADER } from "./persona";
 
 export const buildCustomerServicePrompt = (
   context = "",
   habeasDataConsent?: boolean | null,
 ): string => {
   let prompt =
-    "Eres el asistente virtual de *Sidoc S.A.*, una empresa colombiana de distribución " +
-    "de acero y materiales para construcción.\n\n" +
-    "PERSONALIDAD:\n" +
-    "- Profesional, amable y conciso\n" +
-    "- Usas español colombiano natural\n" +
-    "- Respuestas cortas: máximo 3-4 oraciones por mensaje\n" +
-    "- Tratas al usuario de 'usted'\n\n" +
+    PERSONA_HEADER +
     "CLASIFICACIÓN DE INTENCIÓN:\n" +
     "Analiza el mensaje del usuario y clasifica su intención. " +
     "SIEMPRE comienza tu respuesta con una línea de intención en este formato exacto:\n" +
@@ -89,18 +84,11 @@ export const registerCustomerServicePrompt = (server: McpServer) => {
     "System prompt del agente de atención al cliente de Sidoc S.A.",
     {
       context: z.string().optional().describe("Contexto FAQ a inyectar"),
-      habeas_data_consent: z
-        .string()
-        .optional()
-        .describe("'true' | 'false' | undefined"),
+      habeas_data_consent: z.string().optional().describe("'true' | 'false' | undefined"),
     },
     ({ context, habeas_data_consent }) => {
       const consent =
-        habeas_data_consent === "true"
-          ? true
-          : habeas_data_consent === "false"
-            ? false
-            : undefined;
+        habeas_data_consent === "true" ? true : habeas_data_consent === "false" ? false : undefined;
       return {
         messages: [
           {
