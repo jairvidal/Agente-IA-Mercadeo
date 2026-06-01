@@ -26,8 +26,6 @@ services:
     expose:
       - "${BACKEND_PORT}"
     depends_on:
-      postgres:
-        condition: service_healthy
       redis:
         condition: service_healthy
       mcp-server:
@@ -47,24 +45,6 @@ services:
     expose:
       - "${MCP_SERVER_PORT}"
 
-  postgres:
-    image: pgvector/pgvector:pg17
-    restart: unless-stopped
-    environment:
-      POSTGRES_USER: ${DB_USER}
-      POSTGRES_PASSWORD: ${DB_PASSWORD}
-      POSTGRES_DB: ${DB_NAME}
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-      - ./postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
-    expose:
-      - "5432"
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
   redis:
     image: redis:7-alpine
     restart: unless-stopped
@@ -83,5 +63,4 @@ services:
 volumes:
   caddy_data:
   caddy_config:
-  postgres_data:
   redis_data:
