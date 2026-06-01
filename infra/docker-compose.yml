@@ -12,6 +12,7 @@ services:
     environment:
       API_FQDN: ${API_FQDN}
       ACME_EMAIL: ${ACME_EMAIL}
+      BACKEND_PORT: ${BACKEND_PORT}
     depends_on:
       backend:
         condition: service_healthy
