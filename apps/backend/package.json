@@ -16,6 +16,7 @@
 		"ai": "^6.0.191",
 		"elysia": "latest",
 		"ioredis": "^5.10.1",
+		"pino": "^10.3.1",
 		"zod": "^4.4.3"
 	},
 	"devDependencies": {

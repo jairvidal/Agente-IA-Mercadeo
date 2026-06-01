@@ -2,7 +2,7 @@ name: deploy-dashboard
 
 on:
   push:
-    branches: [main]
+    branches: [staging]
     paths:
       - "apps/dashboard/**"
       - "packages/observability/**"

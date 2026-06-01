@@ -82,9 +82,9 @@ module "github_oidc" {
   source                      = "../../modules/github-oidc"
   name_prefix                 = local.name_prefix
   env                         = local.env
-  github_org                  = "morphux"
+  github_org                  = "jairvidal"
   github_repo                 = "Agente-IA-Mercadeo"
-  allowed_branches            = ["main"]
+  allowed_branches            = ["staging"]
   cloudfront_distribution_arn = module.frontend.distribution_arn
 
   depends_on = [module.registry, module.frontend, module.compute]

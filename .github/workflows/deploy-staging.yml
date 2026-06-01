@@ -3,7 +3,7 @@ name: deploy-staging
 on:
   workflow_run:
     workflows: ["build-push"]
-    branches: [main]
+    branches: [staging]
     types: [completed]
   workflow_dispatch:
     inputs:

@@ -7,6 +7,7 @@ COPY packages/observability/package.json ./packages/observability/
 RUN cd apps/backend && bun install --frozen-lockfile
 
 FROM base AS builder
+ENV NODE_ENV=production
 COPY --from=deps /app/apps/backend/node_modules ./apps/backend/node_modules
 COPY apps/backend ./apps/backend
 COPY packages/observability ./packages/observability
@@ -27,6 +28,7 @@ RUN bun build src/index.ts \
 
 FROM oven/bun:1.3.12-alpine AS runner
 WORKDIR /app
+ENV NODE_ENV=production
 
 COPY --from=deps /app/apps/backend/node_modules ./node_modules
 COPY --from=builder /app/apps/backend/dist/index.js ./index.js
