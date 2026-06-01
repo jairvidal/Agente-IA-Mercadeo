@@ -44,13 +44,73 @@ export const MAX_CLARIFICATION_ATTEMPTS = 2;
 export const SIDOC_HUMAN_ADVISOR_PHONE = "+57 (602) 664-4717";
 
 export const CLARIFICATION_PROMPTS: readonly string[] = [
-  "Disculpe, no entendí bien su mensaje. ¿Podría reformularlo con más detalle?",
-  "Aún no logro entenderle. ¿Me puede dar más detalles sobre lo que necesita?",
+  "Disculpa, no entendí bien tu mensaje. ¿Podrías contarme un poco más para ayudarte mejor?",
+  "Aún no logro entenderte. ¿Me das un poco más de detalle sobre lo que necesitas?",
 ];
 
-export const HUMAN_ADVISOR_REPLY = `Disculpe, no logro entender su consulta. Por favor contacte a un asesor de Sidoc al ${SIDOC_HUMAN_ADVISOR_PHONE}.`;
+/**
+ * Reply shown after `MAX_CLARIFICATION_ATTEMPTS` consecutive `not_understood`
+ * turns. Invites the user to type the advisor keyword (see `ADVISOR_KEYWORDS`)
+ * instead of handing out a phone number, so the handoff stays inside the chat.
+ */
+export const HUMAN_ADVISOR_REPLY =
+  "Lamento no haber podido procesar tu solicitud correctamente, pero no te preocupes, " +
+  "estoy aquí para ayudarte. Si prefieres, puedo conectarte con un asesor; solo escribe *asesor*. " +
+  "También puedes intentar nuevamente con otra consulta y con gusto te apoyo.";
 
 export const NON_COMMERCIAL_REPLY =
-  "Su consulta no es comercial. Para que pueda ser atendido por el área correspondiente, " +
-  `por favor contacte a Sidoc al ${SIDOC_HUMAN_ADVISOR_PHONE} y solicite ser transferido ` +
+  "Tu consulta no es comercial. Para que puedas ser atendido por el área correspondiente, " +
+  `por favor contacta a Sidoc al ${SIDOC_HUMAN_ADVISOR_PHONE} y solicita ser transferido ` +
   "al área pertinente (reclamos, proveedores, contabilidad, gestión humana o chatarra).";
+
+/**
+ * Keywords that, when written by the user as a standalone word, trigger an
+ * explicit handoff to a human advisor (`ADVISOR_TRANSFER_REPLY`). Matched on a
+ * word boundary so "asesoría"/"asesoramiento" do NOT trigger it.
+ */
+export const ADVISOR_KEYWORDS: readonly string[] = ["asesor", "asesores"];
+
+/** Reply sent when the user explicitly asks to talk to a human advisor. */
+export const ADVISOR_TRANSFER_REPLY =
+  "Para brindarte una atención más detallada, voy a transferir nuestra conversación a uno " +
+  "de nuestros asesores, pronto te atenderemos, gracias por tu paciencia 🙂.";
+
+/** IANA timezone used to evaluate Sidoc's business hours. Colombia is UTC-5 (no DST). */
+export const BUSINESS_TIMEZONE = "America/Bogota";
+
+/** Short weekday keys as produced by `Intl.DateTimeFormat(..., { weekday: "short" })` (en-US). */
+export type Weekday = "Sun" | "Mon" | "Tue" | "Wed" | "Thu" | "Fri" | "Sat";
+
+/** Open/close times for a single day, as "HH:MM" in `BUSINESS_TIMEZONE`. */
+export interface DailyHours {
+  open: string;
+  close: string;
+}
+
+/**
+ * Sidoc's service hours. `null` means closed all day.
+ *
+ * Mon-Fri 07:30-16:30 (admin + commercial), Sat 08:00-12:00 (commercial only),
+ * Sun closed.
+ *
+ * TODO: Colombian public holidays ("festivos") are deferred for Sprint 1
+ * (only Sundays are handled as closed). See PRD E-04.3.
+ */
+export const BUSINESS_HOURS: Record<Weekday, DailyHours | null> = {
+  Sun: null,
+  Mon: { open: "07:30", close: "16:30" },
+  Tue: { open: "07:30", close: "16:30" },
+  Wed: { open: "07:30", close: "16:30" },
+  Thu: { open: "07:30", close: "16:30" },
+  Fri: { open: "07:30", close: "16:30" },
+  Sat: { open: "08:00", close: "12:00" },
+};
+
+/** Reply sent outside business hours (gate total). Verbatim copy from Sidoc. */
+export const OFF_HOURS_REPLY =
+  "Gracias por escribirnos. En este momento estamos fuera de nuestro horario de atención. " +
+  "Atendemos de lunes a viernes de 7:30 a.m. a 4:30 p.m. en nuestras áreas administrativas y " +
+  "comerciales, y los sábados de 8:00 a.m. a 12:00 p.m. únicamente en el área comercial " +
+  "(tiendas Sidoc).\n\n" +
+  "Domingos y festivos no contamos con atención.\n\n" +
+  "Con gusto te atenderemos si nos escribes nuevamente dentro de este horario.";

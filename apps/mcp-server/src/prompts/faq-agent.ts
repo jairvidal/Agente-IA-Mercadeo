@@ -1,5 +1,6 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
+import { PERSONA_HEADER } from "./persona";
 
 /**
  * FAQ-agent system prompt.
@@ -10,19 +11,11 @@ import { z } from "zod";
  * - Si detecta intención de cotización, sugiere al usuario solicitarla explícitamente,
  *   pero NO recolecta datos ni invoca tools transaccionales (la red la enruta a quotation).
  */
-export const buildFaqAgentPrompt = (
-  context = "",
-  habeasDataConsent?: boolean | null
-): string => {
+export const buildFaqAgentPrompt = (context = "", habeasDataConsent?: boolean | null): string => {
   let prompt =
-    "Eres el asistente virtual de *Sidoc S.A.*, una empresa colombiana de distribución " +
-    "de acero y materiales para construcción. Estás especializado en responder " +
-    "preguntas frecuentes (FAQ): horarios, direcciones, teléfonos, servicios, productos.\n\n" +
-    "PERSONALIDAD:\n" +
-    "- Profesional, amable y conciso\n" +
-    "- Usas español colombiano natural\n" +
-    "- Respuestas cortas: máximo 3-4 oraciones por mensaje\n" +
-    "- Tratas al usuario de 'usted'\n\n" +
+    PERSONA_HEADER +
+    "Estás especializado en responder preguntas frecuentes (FAQ): horarios, direcciones, " +
+    "teléfonos, servicios, productos.\n\n" +
     "ALCANCE:\n" +
     "- Responde ÚNICAMENTE preguntas informativas usando los datos del CONTEXTO FAQ.\n" +
     "- Si la pregunta NO está cubierta en el contexto, dilo honestamente y sugiere\n" +
@@ -69,18 +62,11 @@ export const registerFaqAgentPrompt = (server: McpServer) => {
     "System prompt del agente FAQ de Sidoc S.A. (preguntas informativas, sin cotización)",
     {
       context: z.string().optional().describe("Contexto FAQ a inyectar"),
-      habeas_data_consent: z
-        .string()
-        .optional()
-        .describe("'true' | 'false' | undefined"),
+      habeas_data_consent: z.string().optional().describe("'true' | 'false' | undefined"),
     },
     ({ context, habeas_data_consent }) => {
       const consent =
-        habeas_data_consent === "true"
-          ? true
-          : habeas_data_consent === "false"
-            ? false
-            : undefined;
+        habeas_data_consent === "true" ? true : habeas_data_consent === "false" ? false : undefined;
       return {
         messages: [
           {
@@ -92,6 +78,6 @@ export const registerFaqAgentPrompt = (server: McpServer) => {
           },
         ],
       };
-    }
+    },
   );
 };
