@@ -73,8 +73,12 @@ output "dashboard_acm_certificate_status" {
   value       = module.frontend.acm_certificate_status
 }
 
-# Uncomment in E-00.5 when GitHub OIDC is configured
-# output "github_actions_role_arn" {
-#   description = "IAM role ARN for GitHub Actions OIDC"
-#   value       = module.github_oidc.role_arn
-# }
+output "github_actions_role_arn" {
+  description = "IAM role ARN for GitHub Actions OIDC — set as repo variable GH_OIDC_ROLE_ARN"
+  value       = module.github_oidc.role_arn
+}
+
+output "ecr_registry_url" {
+  description = "ECR registry host (acct.dkr.ecr.region.amazonaws.com) — set as repo variable ECR_REGISTRY"
+  value       = split("/", values(module.registry.repository_urls)[0])[0]
+}

@@ -37,6 +37,34 @@ resource "aws_iam_role_policy_attachment" "ec2_ssm" {
   policy_arn = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
 }
 
+# ECR read — required for `docker compose pull` during bootstrap and deploys
+resource "aws_iam_role_policy" "ec2_ecr_read" {
+  name = "${local.name}-ec2-ecr-read"
+  role = aws_iam_role.ec2.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect   = "Allow"
+        Action   = ["ecr:GetAuthorizationToken"]
+        Resource = "*"
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "ecr:BatchCheckLayerAvailability",
+          "ecr:GetDownloadUrlForLayer",
+          "ecr:BatchGetImage",
+          "ecr:DescribeRepositories",
+          "ecr:ListImages"
+        ]
+        Resource = "arn:aws:ecr:*:*:repository/${var.name_prefix}-${var.env}-*"
+      }
+    ]
+  })
+}
+
 resource "aws_iam_instance_profile" "ec2" {
   name = "${local.name}-ec2-profile"
   role = aws_iam_role.ec2.name

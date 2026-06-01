@@ -77,12 +77,15 @@ module "frontend" {
 #   alert_email = var.alert_email
 # }
 
-# Step 6 — GitHub Actions OIDC — TODO E-00.5
-# module "github_oidc" {
-#   source           = "../../modules/github-oidc"
-#   name_prefix      = local.name_prefix
-#   env              = local.env
-#   github_org       = "morphux"
-#   github_repo      = "Agente-IA-Mercadeo"
-#   allowed_branches = ["main"]
-# }
+# Step 6 — GitHub Actions OIDC (E-00.5)
+module "github_oidc" {
+  source                      = "../../modules/github-oidc"
+  name_prefix                 = local.name_prefix
+  env                         = local.env
+  github_org                  = "morphux"
+  github_repo                 = "Agente-IA-Mercadeo"
+  allowed_branches            = ["main"]
+  cloudfront_distribution_arn = module.frontend.distribution_arn
+
+  depends_on = [module.registry, module.frontend, module.compute]
+}

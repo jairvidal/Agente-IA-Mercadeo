@@ -1,0 +1,105 @@
+name: deploy-staging
+
+on:
+  workflow_run:
+    workflows: ["build-push"]
+    branches: [main]
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      target_sha:
+        description: "SHA to deploy (rollback). Defaults to HEAD of main."
+        required: false
+        type: string
+
+permissions:
+  id-token: write
+  contents: read
+  actions: read
+
+concurrency:
+  group: deploy-staging
+  cancel-in-progress: false
+
+env:
+  AWS_REGION: us-east-1
+  HEALTH_URL: https://api.marketing.stg.sidocsa.com/health
+
+jobs:
+  deploy:
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: resolve target sha
+        id: sha
+        run: |
+          if [ -n "${{ inputs.target_sha }}" ]; then
+            echo "value=${{ inputs.target_sha }}" >> "$GITHUB_OUTPUT"
+          elif [ -n "${{ github.event.workflow_run.head_sha }}" ]; then
+            echo "value=${{ github.event.workflow_run.head_sha }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "value=${{ github.sha }}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: aws-actions/configure-aws-credentials@e3dd6a429d7300a6a4c196c26e071d42e0343502 # v4.0.2
+        with:
+          role-to-assume: ${{ vars.GH_OIDC_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: send ssm deploy command
+        id: ssm
+        env:
+          SHA: ${{ steps.sha.outputs.value }}
+        run: |
+          set -euo pipefail
+          CMD_ID=$(aws ssm send-command \
+            --document-name AWS-RunShellScript \
+            --targets "Key=tag:Environment,Values=staging" "Key=tag:Project,Values=sidoc-ai-marketing" \
+            --comment "deploy ${SHA}" \
+            --parameters commands="[
+              \"set -euo pipefail\",
+              \"echo ${SHA} | sudo tee /etc/sidoc-ai/last-deployed-tag\",
+              \"cd /opt/sidoc-ai\",
+              \"sudo -E BACKEND_IMAGE_TAG=${SHA} MCP_SERVER_IMAGE_TAG=${SHA} /usr/bin/docker compose --env-file /run/sidoc-ai/.env pull backend mcp-server\",
+              \"sudo -E BACKEND_IMAGE_TAG=${SHA} MCP_SERVER_IMAGE_TAG=${SHA} /usr/bin/docker compose --env-file /run/sidoc-ai/.env up -d --remove-orphans\"
+            ]" \
+            --output text --query "Command.CommandId")
+          echo "command_id=${CMD_ID}" >> "$GITHUB_OUTPUT"
+          echo "command id: ${CMD_ID}"
+
+      - name: wait for ssm command
+        env:
+          CMD_ID: ${{ steps.ssm.outputs.command_id }}
+        run: |
+          set -euo pipefail
+          INSTANCE_ID=$(aws ec2 describe-instances \
+            --filters "Name=tag:Environment,Values=staging" "Name=tag:Project,Values=sidoc-ai-marketing" "Name=instance-state-name,Values=running" \
+            --query "Reservations[0].Instances[0].InstanceId" --output text)
+          echo "polling invocation on ${INSTANCE_ID}"
+          for i in $(seq 1 60); do
+            STATUS=$(aws ssm get-command-invocation --command-id "${CMD_ID}" --instance-id "${INSTANCE_ID}" --query Status --output text 2>/dev/null || echo Pending)
+            echo "[$i] status=${STATUS}"
+            case "${STATUS}" in
+              Success) exit 0 ;;
+              Failed|Cancelled|TimedOut)
+                aws ssm get-command-invocation --command-id "${CMD_ID}" --instance-id "${INSTANCE_ID}" --output json
+                exit 1 ;;
+            esac
+            sleep 5
+          done
+          echo "ssm command did not finish in 5 minutes"
+          exit 1
+
+      - name: health check
+        run: |
+          set -euo pipefail
+          for i in $(seq 1 12); do
+            CODE=$(curl -s -o /dev/null -w '%{http_code}' "${HEALTH_URL}" || echo 000)
+            echo "[$i] /health => ${CODE}"
+            if [ "${CODE}" = "200" ]; then exit 0; fi
+            sleep 10
+          done
+          echo "/health did not return 200 within ~120s"
+          exit 1
