@@ -85,8 +85,8 @@ describe("HandleHabeasDataConsentUseCase — new session (NEEDS_CONSENT)", () =>
 
 		expect(result.ok).toBe(true);
 		if (!result.ok) return;
-		expect(result.value.handled).toBe(true);
-		if (!result.value.handled) return;
+		expect(result.value.intercepted).toBe(true);
+		if (!result.value.intercepted) return;
 		expect(result.value.response).toContain("Ley 1581 de 2012");
 		expect(result.value.response).toContain("Sí");
 		expect(result.value.response).toContain("No");
@@ -138,8 +138,8 @@ describe("HandleHabeasDataConsentUseCase — AWAITING_RESPONSE affirmatives", ()
 
 			expect(result.ok).toBe(true);
 			if (!result.ok) return;
-			expect(result.value.handled).toBe(true);
-			if (!result.value.handled) return;
+			expect(result.value.intercepted).toBe(true);
+			if (!result.value.intercepted) return;
 			expect(result.value.response).toContain("Gracias");
 
 			expect(h.sessions.updateMetadataCalls).toHaveLength(1);
@@ -180,8 +180,8 @@ describe("HandleHabeasDataConsentUseCase — AWAITING_RESPONSE negatives", () =>
 
 			expect(result.ok).toBe(true);
 			if (!result.ok) return;
-			expect(result.value.handled).toBe(true);
-			if (!result.value.handled) return;
+			expect(result.value.intercepted).toBe(true);
+			if (!result.value.intercepted) return;
 			expect(result.value.response).toContain("Entendido");
 
 			expect(h.sessions.updateMetadataCalls).toHaveLength(1);
@@ -207,8 +207,8 @@ describe("HandleHabeasDataConsentUseCase — AWAITING_RESPONSE ambiguous", () =>
 
 			expect(result.ok).toBe(true);
 			if (!result.ok) return;
-			expect(result.value.handled).toBe(true);
-			if (!result.value.handled) return;
+			expect(result.value.intercepted).toBe(true);
+			if (!result.value.intercepted) return;
 			expect(result.value.response).toContain("Sí");
 			expect(result.value.response).toContain("No");
 			expect(h.sessions.updateMetadataCalls).toHaveLength(0);
@@ -219,7 +219,7 @@ describe("HandleHabeasDataConsentUseCase — AWAITING_RESPONSE ambiguous", () =>
 });
 
 describe("HandleHabeasDataConsentUseCase — RESOLVED", () => {
-	it("returns handled=false when habeasDataConsent=true", async () => {
+	it("returns intercepted=false when habeasDataConsent=true", async () => {
 		const h = buildHarness();
 		const session = makeSession({ metadata: { habeasDataConsent: true } });
 
@@ -227,12 +227,12 @@ describe("HandleHabeasDataConsentUseCase — RESOLVED", () => {
 
 		expect(result.ok).toBe(true);
 		if (!result.ok) return;
-		expect(result.value.handled).toBe(false);
+		expect(result.value.intercepted).toBe(false);
 		expect(h.sessions.updateMetadataCalls).toHaveLength(0);
 		expect(result.value.session).toBe(session);
 	});
 
-	it("returns handled=false when habeasDataConsent=false", async () => {
+	it("returns intercepted=false when habeasDataConsent=false", async () => {
 		const h = buildHarness();
 		const session = makeSession({ metadata: { habeasDataConsent: false } });
 
@@ -240,7 +240,7 @@ describe("HandleHabeasDataConsentUseCase — RESOLVED", () => {
 
 		expect(result.ok).toBe(true);
 		if (!result.ok) return;
-		expect(result.value.handled).toBe(false);
+		expect(result.value.intercepted).toBe(false);
 		expect(h.sessions.updateMetadataCalls).toHaveLength(0);
 	});
 });
@@ -268,8 +268,8 @@ describe("HandleHabeasDataConsentUseCase — legacy session without consent stat
 
 		expect(result.ok).toBe(true);
 		if (!result.ok) return;
-		expect(result.value.handled).toBe(true);
-		if (!result.value.handled) return;
+		expect(result.value.intercepted).toBe(true);
+		if (!result.value.intercepted) return;
 		expect(result.value.response).toContain("Ley 1581 de 2012");
 
 		expect(h.sessions.updateMetadataCalls).toHaveLength(1);

@@ -1,14 +1,10 @@
-import { LlmProviderPort } from "@/modules/orchestrator/domain/ports/llm-provider.port";
 import z from "zod";
-import { LlmProviderType } from "../llm/llm-provider.types";
-import { VercelLlmProviderAdapter } from "../llm/vercel-llm-provider.adapter";
+import type { LlmProviderPort } from "@/modules/orchestrator/domain/ports/llm-provider.port";
 import { FallbackLlmProviderAdapter } from "../llm/fallback-llm-provider.adapter";
+import type { LlmProviderType } from "../llm/llm-provider.types";
+import { VercelLlmProviderAdapter } from "../llm/vercel-llm-provider.adapter";
 
-const VALID_PROVIDERS: readonly LlmProviderType[] = [
-  "openai",
-  "anthropic",
-  "gemini",
-];
+const VALID_PROVIDERS: readonly LlmProviderType[] = ["openai", "anthropic", "gemini"];
 
 export const orchestratorConfigSchema = z
   .object({
@@ -18,6 +14,12 @@ export const orchestratorConfigSchema = z
     mcpUrl: z.string().nonempty(),
     mcpToken: z.string().nonempty(),
     mcpTimeoutMs: z.coerce.number().default(10_000),
+    // Defaults to true; only the literal "false"/"0" disables the gate (e.g. so
+    // staging testers are not blocked outside business hours).
+    businessHoursGateEnabled: z
+      .string()
+      .optional()
+      .transform((v) => (v === undefined ? true : v.toLowerCase() !== "false" && v !== "0")),
     llmModel: z.string().nonempty(),
     llmTemperature: z.coerce.number().optional().default(0.3),
     llmTimeoutMs: z.coerce.number().optional().default(30_000),
@@ -54,6 +56,7 @@ export function readOrchestratorConfig(env = process.env): OrchestratorConfig {
     mcpUrl: env.MCP_SERVER_URL,
     mcpToken: env.MCP_INTERNAL_TOKEN,
     mcpTimeoutMs: env.MCP_TIMEOUT_MS,
+    businessHoursGateEnabled: env.BUSINESS_HOURS_GATE_ENABLED,
     llmModel: env.LLM_MODEL,
     llmProvider: env.LLM_PROVIDER,
     llmTemperature: env.LLM_TEMPERATURE,
@@ -75,10 +78,7 @@ function readPrimaryLlmConfig(config: OrchestratorConfig): LlmConfig {
   return { provider: llmProvider, model: llmModel, apiKey: apiKey! };
 }
 
-function readFallbackChain(
-  primary: LlmConfig,
-  config: OrchestratorConfig,
-): LlmConfig[] {
+function readFallbackChain(primary: LlmConfig, config: OrchestratorConfig): LlmConfig[] {
   const raw = config.llmFallbackChain?.trim();
   if (!raw) return [];
 
@@ -89,9 +89,7 @@ function readFallbackChain(
     .filter(Boolean)) {
     const [provider, model] = entry.split(":");
     if (!provider || !model) {
-      throw new Error(
-        `Invalid LLM_FALLBACK_CHAIN entry "${entry}". Expected "provider:model".`,
-      );
+      throw new Error(`Invalid LLM_FALLBACK_CHAIN entry "${entry}". Expected "provider:model".`);
     }
 
     if (provider === primary.provider && model === primary.model) {
@@ -100,9 +98,7 @@ function readFallbackChain(
     }
     const apiKey = config.llmApiKeys[provider as LlmProviderType];
     if (!apiKey) {
-      throw new Error(
-        `LLM_FALLBACK_CHAIN entry "${entry}" needs the API key for ${provider}.`,
-      );
+      throw new Error(`LLM_FALLBACK_CHAIN entry "${entry}" needs the API key for ${provider}.`);
     }
     chain.push({ provider: provider as LlmProviderType, model, apiKey });
   }
