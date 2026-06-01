@@ -57,15 +57,59 @@ DASHBOARD_ORIGIN=https://marketing.stg.sidocsa.com
 # See CLAUDE.md → "Variables de entorno"
 ```
 
-## Deploy mechanism
+## Deploy mechanism (E-00.5)
 
-The files in this directory are **not** rsynced or built into a container image — they
-are uploaded as-is to `/opt/sidoc-ai/` by the deploy workflow in E-00.5 (`deploy-staging.yml`):
+Five GitHub Actions workflows live in `.github/workflows/`:
 
-1. GitHub Actions assumes the deploy role via OIDC
-2. `aws ssm send-command` copies these files to the EC2 (or syncs via S3)
-3. `docker compose pull && docker compose up -d`
-4. `bootstrap.sh` reads SM into `/run/sidoc-ai/.env` and restarts containers
+| Workflow | Trigger | What it does |
+|---|---|---|
+| `ci.yml` | PR to `main` | typecheck + tests per app (matrix), dashboard bundle secret-scan |
+| `build-push.yml` | push to `main` touching `apps/backend/**`, `apps/mcp-server/**`, `packages/observability/**` | `docker buildx` linux/arm64 → push to ECR tagged `:${sha}` (no `:latest` — ECR repos are IMMUTABLE) |
+| `deploy-staging.yml` | `build-push` finished success, or manual `workflow_dispatch` with `target_sha` (rollback) | SSM SendCommand to the EC2 → write `${sha}` to `/etc/sidoc-ai/last-deployed-tag` → `docker compose pull && up -d` with `BACKEND_IMAGE_TAG=${sha}` and `MCP_SERVER_IMAGE_TAG=${sha}` → poll `/health` |
+| `deploy-dashboard.yml` | push to `main` touching `apps/dashboard/**` | `bun run build` → `aws s3 sync` (hashed assets immutable, `index.html` no-cache) → CloudFront invalidation `/index.html` + `/` → smoke check |
+| `refresh-secrets.yml` | manual `workflow_dispatch` | SSM SendCommand → `systemctl restart sidoc-ai-bootstrap.service` → poll `/health` |
 
-For manual changes during development, use `aws ssm start-session` and edit the files
-on the host. Persist any change back to this repo to keep them in sync.
+`deploy-staging` and `refresh-secrets` share the concurrency group `deploy-staging` so they never race.
+
+### Tag pinning across reboots
+
+ECR repos use `IMMUTABLE` tags. `:latest` never exists. The deploy workflow writes the
+deployed sha to `/etc/sidoc-ai/last-deployed-tag` via SSM; `bootstrap.sh` reads that
+file on every run and exports `BACKEND_IMAGE_TAG` + `MCP_SERVER_IMAGE_TAG` before
+`docker compose up`. Without this, an EC2 reboot would try to pull `:latest` and fail.
+
+### Repo variables (one-time setup)
+
+After `terraform apply` in `terraform/envs/staging`, configure these under
+`Settings → Secrets and variables → Actions → Variables`:
+
+| Variable | Source (terraform output) | Example |
+|---|---|---|
+| `GH_OIDC_ROLE_ARN` | `github_actions_role_arn` | `arn:aws:iam::474348379988:role/sidoc-ai-marketing-staging-github-actions-role` |
+| `ECR_REGISTRY` | `ecr_registry_url` | `474348379988.dkr.ecr.us-east-1.amazonaws.com` |
+| `CF_DIST_ID` | `cloudfront_distribution_id` | `E1ABC...` |
+| `DASHBOARD_BUCKET` | `dashboard_bucket` | `sidoc-ai-marketing-staging-dashboard` |
+| `VITE_API_URL` | static | `https://api.marketing.stg.sidocsa.com` |
+
+`VITE_*` are public — they land in the JS bundle. Never store secrets there.
+
+### Rollback runbook
+
+1. `gh workflow run deploy-staging.yml -f target_sha=<previous-sha>` (the sha must already
+   exist in ECR; check with `aws ecr list-images --repository-name sidoc-ai-marketing-staging-backend`).
+2. Watch the run; `health check` job must hit `200`.
+3. If health stays red, re-run with the prior good sha or fall back to manual `ssm start-session`
+   and `docker compose up -d` with the desired `*_IMAGE_TAG`.
+
+### First-time deploy
+
+Before merging the workflows for the first time:
+
+1. `cd terraform/envs/staging && terraform apply` (creates OIDC provider + IAM role).
+2. Configure repo variables (table above).
+3. EC2 already has the new bootstrap script via `terraform apply` on the `compute` module
+   (which updates the `user_data`). Existing EC2 instances **do not** re-run user_data;
+   `scp` or `ssm` the updated `bootstrap.sh` to `/opt/sidoc-ai/bootstrap.sh`, then
+   `sudo systemctl restart sidoc-ai-bootstrap.service` once.
+4. Merge the `chore/cicd-e00-5` branch.
+5. First `build-push` runs; first `deploy-staging` follows; `/health` should return 200.

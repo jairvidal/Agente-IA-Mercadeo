@@ -31,6 +31,7 @@ unzip -q /tmp/awscliv2.zip -d /tmp
 rm -rf /tmp/aws /tmp/awscliv2.zip
 
 install -d -m 0755 /opt/sidoc-ai
+install -d -m 0755 /etc/sidoc-ai
 install -d -m 0700 /run/sidoc-ai
 
 cat <<BOOTSTRAP > /opt/sidoc-ai/bootstrap.sh
@@ -39,6 +40,7 @@ set -euo pipefail
 
 ENV_DIR="/run/sidoc-ai"
 ENV_FILE="\$ENV_DIR/.env"
+TAG_FILE="/etc/sidoc-ai/last-deployed-tag"
 
 install -d -m 0700 "\$ENV_DIR"
 
@@ -49,9 +51,29 @@ aws secretsmanager get-secret-value \\
   --output text \\
   | jq -r 'to_entries | .[] | "\(.key)=\(.value)"' > "\$ENV_FILE"
 
+# Pin image tags to the last successfully deployed sha (written by deploy-staging.yml).
+# Without this, a reboot would resolve images to :latest, which does not exist with
+# IMMUTABLE ECR tags.
+if [ -f "\$TAG_FILE" ]; then
+  TAG="\$(tr -d '[:space:]' < "\$TAG_FILE")"
+  if [ -n "\$TAG" ]; then
+    echo "BACKEND_IMAGE_TAG=\$TAG" >> "\$ENV_FILE"
+    echo "MCP_SERVER_IMAGE_TAG=\$TAG" >> "\$ENV_FILE"
+  fi
+fi
+
 chmod 0600 "\$ENV_FILE"
 
+# ECR login so docker compose pull/up can resolve image manifests on boot.
+aws ecr get-login-password --region "$AWS_REGION" \\
+  | docker login --username AWS --password-stdin \\
+      "\$(aws sts get-caller-identity --query Account --output text).dkr.ecr.$AWS_REGION.amazonaws.com"
+
 if [ -f /opt/sidoc-ai/docker-compose.yml ]; then
+  /usr/bin/docker compose \\
+    -f /opt/sidoc-ai/docker-compose.yml \\
+    --env-file "\$ENV_FILE" \\
+    pull
   /usr/bin/docker compose \\
     -f /opt/sidoc-ai/docker-compose.yml \\
     --env-file "\$ENV_FILE" \\

@@ -25,3 +25,8 @@ variable "allowed_branches" {
   type        = list(string)
   default     = ["main"]
 }
+
+variable "cloudfront_distribution_arn" {
+  description = "ARN of the CloudFront distribution allowed to be invalidated by the role"
+  type        = string
+}
